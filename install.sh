@@ -34,20 +34,26 @@ STATUS="$(/usr/bin/perl "$PATCHER" status ${APP_ARG[@]+"${APP_ARG[@]}"} 2>&1)"; 
 if [ $RC -ne 0 ]; then say_msg "$STATUS"; exit $RC; fi
 STATE="$(printf '%s\n' "$STATUS" | sed -n 1p)"
 APP="$(printf '%s\n' "$STATUS" | sed -n 2p)"
+MODE="$(printf '%s\n' "$STATUS" | sed -n 3p)"
+VER="$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$APP/Contents/Info.plist" 2>/dev/null || echo unknown)"
+NOTE=""
+[ "$MODE" = "basic" ] && NOTE="
+
+Note: this is version $VER, not the 7.0.5 build the patch was made for. It will be installed in basic mode, which switches the app to vivo's own built-in English. It has not been tested on this version and some screens may stay in Chinese."
 
 if [ -n "$AUTO" ]; then
   ACTION="$AUTO"
 else
   case "$STATE" in
-    original) CHOICE="$(ask "vivo Office Kit was found and is currently in Chinese.
+    original) CHOICE="$(ask "vivo Office Kit $VER was found and is currently in Chinese.
 
-Install the English patch? The original is kept as a backup and can be restored at any time by running this again." "Install English" "Cancel" "Install English")" ;;
+Install the English patch? The original is kept as a backup and can be restored at any time by running this again.$NOTE" "Install English" "Cancel" "Install English")" ;;
     patched)  CHOICE="$(ask "The English patch is already installed.
 
-You can reinstall it (for example after updating this patch) or restore the original Chinese version." "Reinstall English" "Cancel" "Restore Chinese" "Reinstall English")" ;;
-    *)        CHOICE="$(ask "This copy of vivo Office Kit is not the build this patch was made for (7.0.5 for Apple silicon, China edition).
+You can reinstall it (for example after updating this patch) or restore the original Chinese version.$NOTE" "Reinstall English" "Cancel" "Restore Chinese" "Reinstall English")" ;;
+    *)        CHOICE="$(ask "This copy of vivo Office Kit (version $VER) is too different from the one this patch was made for: $(printf '%s\n' "$STATUS" | sed -n 4p).
 
-The patch refuses to modify other versions, so nothing will be changed." "OK" "OK")"; exit 3 ;;
+Nothing will be changed." "OK" "OK")"; exit 3 ;;
   esac
   case "$CHOICE" in
     "Install English"|"Reinstall English") ACTION=install ;;
