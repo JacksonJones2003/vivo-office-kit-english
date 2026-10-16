@@ -1,0 +1,5 @@
+/* Added by the vivo Office Kit English patch so macOS shows its own windows (file pickers, menus) in English. */
+"CFBundleDisplayName" = "vivo Office Kit";
+"CFBundleName" = "vivo Office Kit";
+"move_to_trash" = "“Finder” wants to move “vivo Office Kit” to the Trash";
+"remote_pc_upgrade" = "Authorize the “vivo Office Kit Remote PC” upgrade";

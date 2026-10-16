@@ -21,7 +21,7 @@ use JSON::PP;
 use File::Basename qw(dirname);
 use Cwd qw(abs_path);
 
-my $PATCH_VERSION = '1.1.0';
+my $PATCH_VERSION = '1.2.0';
 my $BLOCK  = 4 * 1024 * 1024;
 my $MARK   = ";(function(){try{\n/* English patch";   # start of patch/main_prefix.js
 my $DIST   = 'dist/electron';
@@ -39,7 +39,25 @@ sub perm { return ($!{EACCES} || $!{EPERM}) ? 4 : 1; }
 fail(2, "vivo Office Kit (pcsuite.app) was not found in /Applications. Install it first.") unless defined $app && -d "$app/Contents/Resources";
 my $res = "$app/Contents/Resources";
 my ($asar, $backup, $marker) = ("$res/app.asar", "$res/app.asar.zh-backup", "$res/app.asar.english-patch");
+my $lproj = "$res/en.lproj";   # tells macOS the app supports English, so its own windows (file pickers) are English
 fail(2, "app.asar not found in $res") unless -f $asar;
+
+sub marker_says { my ($key) = @_; open(my $fh, '<', $marker) or return ''; while (<$fh>) { return $1 if /^\Q$key\E=(.*)$/ } return ''; }
+sub add_lproj {   # returns 'created', 'present' (the app already had one) or 'failed'
+    return 'present' if -d $lproj && marker_says('lproj') ne 'created';
+    mkdir $lproj unless -d $lproj;
+    my $data = -f "$pdir/en.lproj/InfoPlist.strings" ? slurp("$pdir/en.lproj/InfoPlist.strings") : undef;
+    return 'failed' unless defined $data && -d $lproj;
+    open(my $fh, '>:raw', "$lproj/InfoPlist.strings") or return 'failed';
+    print $fh $data; close $fh;
+    my @st = stat($res); chown($st[4], $st[5], $lproj, "$lproj/InfoPlist.strings");
+    utime(undef, undef, $app);   # nudge macOS into re-reading the app's languages
+    return 'created';
+}
+sub remove_lproj {
+    return unless marker_says('lproj') eq 'created' && -d $lproj;
+    unlink "$lproj/InfoPlist.strings"; rmdir $lproj; utime(undef, undef, $app);
+}
 
 # ---------------------------------------------------------------- archive helpers
 sub read_header {
@@ -188,6 +206,7 @@ if ($cmd eq 'restore') {
     fail(1, "The English patch is not installed, so there is nothing to restore.") unless $cur_patched;
     fail(1, "The backup of the original archive is missing. Reinstall vivo Office Kit from vivo's installer to restore it.") unless $bak;
     rename($backup, $asar) or fail(perm(), "Could not restore: $!");
+    remove_lproj();
     unlink $marker;
     print "Restored the original Chinese version.\n"; exit 0;
 }
@@ -248,7 +267,9 @@ my @st = stat($source->{path});
 chmod($st[2] & 07777, $tmp); chown($st[4], $st[5], $tmp);
 if (!$cur_patched) { rename($asar, $backup) or do { unlink $tmp; fail(perm(), "Could not back up the original: $!"); }; }
 rename($tmp, $asar) or do { rename($backup, $asar) unless $cur_patched; unlink $tmp; fail(perm(), "Could not install the patched archive: $!"); };
-if (open(my $mf, '>', $marker)) { print $mf "patch=$PATCH_VERSION\nmode=$p->{mode}\ndetail=$p->{detail}\n"; close $mf; chown($st[4], $st[5], $marker); }
+my $lp = add_lproj();
+$lp = 'created' if $lp eq 'present' && marker_says('lproj') eq 'created';
+if (open(my $mf, '>', $marker)) { print $mf "patch=$PATCH_VERSION\nmode=$p->{mode}\ndetail=$p->{detail}\nlproj=$lp\n"; close $mf; chown($st[4], $st[5], $marker); }
 
 if ($p->{mode} eq 'full') { print "English patch installed ($p->{detail}). The original is kept as a backup.\n"; }
 else { print "English patch installed in basic mode ($p->{detail}). This version differs from the one the patch was built for, so some screens may stay in Chinese. The original is kept as a backup.\n"; }

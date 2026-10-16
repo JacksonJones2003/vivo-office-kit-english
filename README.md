@@ -57,13 +57,17 @@ After vivo Office Kit updates itself, just run the installer again.
 
 ## What it does
 
-The patch changes one file, `Contents/Resources/app.asar` (the app's JavaScript and text). It does not touch
+The patch changes `Contents/Resources/app.asar` (the app's JavaScript and text) and adds a small
+`Contents/Resources/en.lproj` folder. It does not touch
 vivo's programs, background services or system extensions, and it needs nothing beyond what ships with macOS.
 
 - Unlocks vivo's own built-in English translation, which the China edition forces off even on an English Mac.
 - Adds English for about 200 strings vivo never translated.
 - Replaces several thousand Chinese strings written directly in the code (recorder, AI features, calendar,
   backup, connection guides, menus). Full mode only.
+- Tells macOS the app supports English (the China edition only declares Chinese), so macOS's own windows
+  inside the app, such as the file picker for importing files, and the app's name in the menu bar are English.
+  If the app already has an English folder, it is left alone.
 - Makes the vivo account sign-in window English by asking vivo's sign-in page for English, and shows a
   built-in English slide next to it instead of the Chinese slideshow sent by vivo's servers.
 - Makes the phone mirroring and PC mode windows English. Those helper programs only load English when a
@@ -101,6 +105,7 @@ after. In both modes the rebuilt archive is read back and verified before it rep
 | `patcher.pl` | Does the work: `perl patcher.pl status`, `install` or `restore`. |
 | `patch/edits.dat` | The exact edit list for 7.0.5 (full mode). |
 | `patch/main_prefix.js` | Small startup script added to the app for the mirroring and sign-in language fixes. |
+| `patch/en.lproj/InfoPlist.strings` | English app name, so macOS shows its own windows in English. |
 | `patch/locale_extra.tsv` | English for the strings vivo never translated (used in basic mode). |
 
 ## License
