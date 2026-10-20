@@ -55,12 +55,16 @@ when the installer asks, it sets up a small background helper:
   reinstall, and it also watches the Applications folder, so it notices a freshly installed copy. vivo's installer
   makes the app read-only for your account; in that case the helper shows a popup asking to apply the English patch
   and macOS asks for your password.
+- **That popup comes back every time you open vivo Office Kit** while it is not in English. **Not Now** (or a popup
+  you missed) only skips that time. Tick **Don't remind me again** to stop the popups; running the installer again
+  turns them back on. To notice the app being opened, a tiny background loop checks every 10 seconds whether vivo
+  Office Kit is running (one process lookup; it does nothing else).
 - If vivo ships a version that no published translation covers yet, the helper applies basic mode straight away and
   offers the full translation once a matching release is published here.
 - A log is kept in `~/Library/Logs/vivo-office-kit-english.log`.
 
 To turn it off, run the installer and choose **Restore Chinese**, or run
-`watcher/setup-watcher.sh remove` from this folder.
+`watcher/setup-watcher.sh remove` from this folder. Both remove the helper and its launch monitor.
 
 ## Should I install vivo's update?
 

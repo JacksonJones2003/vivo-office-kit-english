@@ -8,6 +8,7 @@ SRC="$(cd "$(dirname "$0")/.." && pwd)"
 W="$HOME/Library/Application Support/vivo-office-kit-english-watcher"
 APPLET="$W/vivo English Watcher.app"
 LABEL="io.github.jacksonjones2003.vivo-english-watcher"
+MLABEL="io.github.jacksonjones2003.vivo-english-monitor"
 PLIST="$HOME/Library/LaunchAgents/$LABEL.plist"
 DOMAIN="gui/$(id -u)"
 
@@ -16,7 +17,8 @@ status)
   if /bin/launchctl print "$DOMAIN/$LABEL" >/dev/null 2>&1; then echo on; else echo off; fi ;;
 remove)
   /bin/launchctl bootout "$DOMAIN/$LABEL" >/dev/null 2>&1
-  rm -f "$PLIST"
+  /bin/launchctl bootout "$DOMAIN/$MLABEL" >/dev/null 2>&1
+  rm -f "$PLIST" "$HOME/Library/LaunchAgents/$MLABEL.plist"
   rm -rf "$W"
   echo "Automatic re-patching is off." ;;
 install)
@@ -26,6 +28,7 @@ install)
   cp -R "$SRC/patcher.pl" "$SRC/patch" "$W/kit.new/" || { echo "Could not copy the patch files." >&2; exit 1; }
   rm -rf "$W/kit"; mv "$W/kit.new" "$W/kit"
   cp "$SRC/watcher/reapply.sh" "$W/reapply.sh"; chmod +x "$W/reapply.sh"
+  rm -f "$W/no-reminders" "$W/snoozed-copy"   # running the installer turns reminder popups back on
   # The helper app is created once and then left alone, so the App Management permission you give it sticks.
   if [ ! -d "$APPLET" ]; then
     /usr/bin/osacompile -o "$APPLET" \
@@ -65,6 +68,7 @@ PL
   [ -n "${VOK_NO_LAUNCHD:-}" ] && { echo "(test) watcher files created, not started"; exit 0; }
   /bin/launchctl bootout "$DOMAIN/$LABEL" >/dev/null 2>&1
   /bin/launchctl bootstrap "$DOMAIN" "$PLIST" || { echo "Could not start the watcher." >&2; exit 1; }
+  /bin/bash "$W/reapply.sh" ensure-monitor   # reminder popups whenever vivo Office Kit is opened unpatched
   # Ask macOS for the App Management permission now, while you are here, rather than during a future update.
   VOK_MODE=check "$APPLET/Contents/MacOS/applet" >/dev/null 2>&1
   echo "Automatic re-patching is on." ;;

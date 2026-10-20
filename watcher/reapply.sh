@@ -3,7 +3,10 @@
 # If vivo's updater has put the original Chinese archive back, re-applies the English patch.
 #   reapply.sh          normal run
 #   reapply.sh check    only check that macOS lets the watcher modify the app (triggers the permission prompt)
+#   reapply.sh monitor  stay running; whenever vivo Office Kit is opened, do a normal run (reminder popups)
+#   reapply.sh ensure-monitor   install/refresh the launch agent that runs "monitor"
 # Test hooks: VOK_APP=/path/to/pcsuite.app  VOK_AUTO=1 (no dialogs)  VOK_MANIFEST_URL=... (update source)
+#             VOK_CHOICE="<button>\t<0|1>" (answer for the reminder alert in test mode)  VOK_TRIGGER=launch
 set -u
 W="$HOME/Library/Application Support/vivo-office-kit-english-watcher"
 KIT="$W/kit"
@@ -21,6 +24,30 @@ on run argv
 end run
 OSA
 }
+# ask_check "message" "main button" "other button" -> prints "<button>\t<1 if 'Don't remind me again' ticked>"
+ask_check() {
+  if [ -n "${VOK_AUTO:-}" ]; then printf '%s\n' "${VOK_CHOICE:-$2	0}"; return; fi
+  local r; r="$(/usr/bin/osascript -l JavaScript - "$TITLE" "$1" "$2" "$3" "Don't remind me again" <<'JXA' 2>/dev/null
+function run(argv) {
+  ObjC.import('AppKit');
+  var app = $.NSApplication.sharedApplication;
+  app.setActivationPolicy(1);
+  var a = $.NSAlert.alloc.init;
+  a.messageText = argv[0]; a.informativeText = argv[1];
+  a.addButtonWithTitle(argv[2]); a.addButtonWithTitle(argv[3]);
+  a.showsSuppressionButton = true; a.suppressionButton.title = argv[4];
+  a.layout; a.window.level = 3;                   // stay above the vivo windows and permission prompts
+  app.activateIgnoringOtherApps(true);
+  var r = a.runModal;
+  return ((r == 1000) ? argv[2] : argv[3]) + '\t' + (a.suppressionButton.state == 1 ? '1' : '0');
+}
+JXA
+)"
+  case "$r" in *"	"*) printf '%s\n' "$r"; return ;; esac
+  # Fallback: a plain dialog, with the checkbox turned into a third button.
+  local c; c="$(ask "$1" "$2" "Don't Remind Me" "$3" "$2")"
+  case "$c" in "Don't Remind Me") printf '%s\t1\n' "$3" ;; "") printf '%s\t0\n' "$3" ;; *) printf '%s\t0\n' "$c" ;; esac
+}
 notify() { [ -n "${VOK_AUTO:-}" ] && return; /usr/bin/osascript -e 'on run argv' -e 'display notification (item 2 of argv) with title (item 1 of argv)' -e 'end run' "$TITLE" "$1" >/dev/null 2>&1; }
 need_permission() {
   log "macOS blocked the change (App Management)"
@@ -32,19 +59,26 @@ Open System Settings > Privacy & Security > App Management and switch on \"vivo 
 
 # Runs the patcher; if vivo's installer left the app owned by the system (a fresh install or reinstall),
 # asks once for your password instead of failing. Sets OUT and RC.
-DECLINED_ADMIN="$W/declined-admin"
+# Reminders: the popup appears every time vivo Office Kit is opened while it is not in English. "Not Now" (or a
+# popup that was missed) only skips this time; background checks then stay quiet for that copy. Ticking
+# "Don't remind me again" stops the popups until the installer is run again.
+NOREMIND="$W/no-reminders"; SNOOZE="$W/snoozed-copy"
 do_install() {
   OUT="$(/usr/bin/perl "$KIT/patcher.pl" install --app "$APP" 2>&1)"; RC=$?
   [ $RC -eq 4 ] && [ ! -w "$RES" ] || return 0
   local stamp; stamp="$(/usr/bin/stat -f '%m %z' "$RES/app.asar" 2>/dev/null)"
-  if [ -f "$DECLINED_ADMIN" ] && [ "$(cat "$DECLINED_ADMIN")" = "$stamp" ]; then RC=0; OUT="skipped (you chose Not Now for this copy)"; SKIPPED=1; return 0; fi
-  local c; c="$(ask "vivo Office Kit was installed or reinstalled with vivo's installer, which made it read-only for your account, so the English patch could not be applied.
+  if [ -f "$NOREMIND" ]; then RC=0; OUT="skipped (reminders turned off with \"Don't remind me again\")"; SKIPPED=1; return 0; fi
+  if [ "${VOK_TRIGGER:-}" != "launch" ] && [ -f "$SNOOZE" ] && [ "$(cat "$SNOOZE")" = "$stamp" ]; then RC=0; OUT="skipped (Not Now; will ask again when vivo Office Kit is opened)"; SKIPPED=1; return 0; fi
+  log "showing the reminder popup (vivo Office Kit is read-only and not in English)"
+  local r btn sup; r="$(ask_check "vivo Office Kit is not in English. It was installed, reinstalled or updated with vivo's installer, which made it read-only for your account, so the English patch could not be applied automatically.
 
-Apply the English patch now? macOS will ask for your Mac password." "Apply English" "Not Now" "Apply English")"
-  if [ "$c" != "Apply English" ]; then echo "$stamp" > "$DECLINED_ADMIN"; RC=0; OUT="skipped (Not Now)"; SKIPPED=1; return 0; fi
+Apply the English patch now? macOS will ask for your Mac password." "Apply English" "Not Now")"
+  btn="${r%%	*}"; sup="${r##*	}"
+  if [ "$sup" = "1" ]; then : > "$NOREMIND"; log "reminders turned off (Don't remind me again)"; fi
+  if [ "$btn" != "Apply English" ]; then echo "$stamp" > "$SNOOZE"; RC=0; OUT="skipped (Not Now)"; SKIPPED=1; return 0; fi
   log "app is read-only for this user; asking for an administrator password"
   if [ -n "${VOK_FAKE_ADMIN:-}" ]; then   # test hook: stands in for the password prompt
-    /bin/chmod u+w "$RES"; OUT="$(/usr/bin/perl "$KIT/patcher.pl" install --app "$APP" 2>&1)"; RC=$?; rm -f "$DECLINED_ADMIN"; return 0
+    /bin/chmod u+w "$RES"; OUT="$(/usr/bin/perl "$KIT/patcher.pl" install --app "$APP" 2>&1)"; RC=$?; rm -f "$SNOOZE"; return 0
   fi
   [ -n "${VOK_AUTO:-}" ] && return 0
   OUT="$(/usr/bin/osascript - "$KIT/patcher.pl" "$APP" <<'OSA' 2>&1
@@ -55,7 +89,7 @@ OSA
 )"; RC=$?
   case "$OUT" in *"User canceled"*|*"-128"*) RC=0; OUT="skipped (password prompt cancelled)"; SKIPPED=1 ;; esac
   [ $RC -ne 0 ] && case "$OUT" in *"not permitted"*|*"Cannot write"*|*"Could not"*) RC=4 ;; esac
-  rm -f "$DECLINED_ADMIN"
+  [ $RC -eq 0 ] && rm -f "$SNOOZE"
 }
 SKIPPED=""
 
@@ -64,6 +98,57 @@ PL="$HOME/Library/LaunchAgents/io.github.jacksonjones2003.vivo-english-watcher.p
 if [ -f "$PL" ] && ! /usr/bin/grep -q '<string>/Applications</string>' "$PL"; then
   /usr/libexec/PlistBuddy -c "Add :WatchPaths: string /Applications" "$PL" >/dev/null 2>&1 && log "watching /Applications from next login (catches full reinstalls)"
 fi
+
+MLABEL="io.github.jacksonjones2003.vivo-english-monitor"
+MPL="$HOME/Library/LaunchAgents/$MLABEL.plist"
+ensure_monitor() {   # the agent that keeps "monitor" running (added in 1.6.0; older helpers add it themselves)
+  [ -n "${VOK_APP:-}${VOK_AUTO:-}" ] && return 0          # never during tests
+  [ -f "$PL" ] || return 0                                 # automatic re-patching is off
+  local applet="$W/vivo English Watcher.app/Contents/MacOS/applet"
+  [ -x "$applet" ] || return 0
+  [ -f "$MPL" ] && [ "${1:-}" != "force" ] && return 0
+  cat > "$MPL" <<PLIST
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>$MLABEL</string>
+  <key>ProgramArguments</key><array><string>$applet</string></array>
+  <key>EnvironmentVariables</key><dict><key>VOK_MODE</key><string>monitor</string></dict>
+  <key>RunAtLoad</key><true/>
+  <key>KeepAlive</key><true/>
+  <key>ThrottleInterval</key><integer>30</integer>
+  <key>ProcessType</key><string>Background</string>
+  <key>LowPriorityIO</key><true/>
+</dict>
+</plist>
+PLIST
+  /bin/launchctl bootout "gui/$(id -u)/$MLABEL" >/dev/null 2>&1
+  /bin/launchctl bootstrap "gui/$(id -u)" "$MPL" >/dev/null 2>&1 && log "started the launch monitor (reminders when vivo Office Kit is opened)"
+}
+if [ "${1:-}" = "ensure-monitor" ]; then ensure_monitor force; exit 0; fi
+if [ "${1:-}" = "monitor" ]; then
+  # Cheap loop: every 10 seconds, is vivo Office Kit running? Each new launch triggers one normal run.
+  log "launch monitor running"
+  last=""
+  while :; do
+    pid=""
+    for a in /Applications/pcsuite.app /Applications/pcsuite.localized/pcsuite.app; do
+      p="$(/usr/bin/pgrep -f "^$a/Contents/MacOS/pcsuite( |\$)" 2>/dev/null | head -1)"; [ -n "$p" ] && { pid="$p"; break; }
+    done
+    if [ -n "$pid" ] && [ "$pid" != "$last" ]; then last="$pid"; VOK_TRIGGER=launch /bin/bash "$W/reapply.sh"; fi
+    [ -z "$pid" ] && last=""
+    sleep 10
+  done
+fi
+
+# One run at a time, so two triggers can never show two popups.
+LOCK="$W/.run-lock"
+if ! /bin/mkdir "$LOCK" 2>/dev/null; then
+  if [ -n "$(/usr/bin/find "$LOCK" -maxdepth 0 -mmin +15 2>/dev/null)" ]; then rm -rf "$LOCK"; /bin/mkdir "$LOCK" 2>/dev/null || exit 0; else exit 0; fi
+fi
+trap 'rm -rf "$LOCK"' EXIT
+ensure_monitor
 
 APP="${VOK_APP:-}"
 if [ -z "$APP" ]; then for a in /Applications/pcsuite.app /Applications/pcsuite.localized/pcsuite.app; do [ -d "$a/Contents/Resources" ] && { APP="$a"; break; }; done; fi
@@ -96,7 +181,7 @@ maybe_update() {
   local force="$1" now; now=$(date +%s)
   # Check at most every 12 hours, or every hour when you open vivo Office Kit, unless vivo just changed
   # or this version is not fully supported.
-  local limit=43200; [ -f "$REQ" ] && { limit=3600; rm -f "$REQ"; }
+  local limit=43200; [ -f "$REQ" ] && { limit=3600; rm -f "$REQ"; }; [ "${VOK_TRIGGER:-}" = "launch" ] && limit=3600
   if [ "$force" != 1 ] && [ -f "$STAMP" ] && [ $((now - $(cat "$STAMP" 2>/dev/null || echo 0))) -lt "$limit" ]; then return; fi
   echo "$now" > "$STAMP"
   local mf; mf="$(/usr/bin/curl -fsSL --max-time 20 "$MANIFEST_URL" 2>/dev/null)" || { log "update check: could not reach GitHub"; return; }
