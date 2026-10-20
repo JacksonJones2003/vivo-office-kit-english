@@ -51,6 +51,10 @@ when the installer asks, it sets up a small background helper:
   Only if you click **Install** does it download the release zip from this repository's Releases page, check it
   against the SHA-256 checksum in `latest.json`, switch to it, and re-patch the app. **Not Now** silences that
   version for three days.
+- **Reinstalling vivo Office Kit from scratch is covered too.** The helper lives outside the app, so it survives a
+  reinstall, and it also watches the Applications folder, so it notices a freshly installed copy. vivo's installer
+  makes the app read-only for your account; in that case the helper shows a popup asking to apply the English patch
+  and macOS asks for your password.
 - If vivo ships a version that no published translation covers yet, the helper applies basic mode straight away and
   offers the full translation once a matching release is published here.
 - A log is kept in `~/Library/Logs/vivo-office-kit-english.log`.

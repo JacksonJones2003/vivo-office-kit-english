@@ -30,6 +30,41 @@ Open System Settings > Privacy & Security > App Management and switch on \"vivo 
   [ "$C" = "Open Settings" ] && /usr/bin/open "x-apple.systempreferences:com.apple.preference.security?Privacy_AppBundles"
 }
 
+# Runs the patcher; if vivo's installer left the app owned by the system (a fresh install or reinstall),
+# asks once for your password instead of failing. Sets OUT and RC.
+DECLINED_ADMIN="$W/declined-admin"
+do_install() {
+  OUT="$(/usr/bin/perl "$KIT/patcher.pl" install --app "$APP" 2>&1)"; RC=$?
+  [ $RC -eq 4 ] && [ ! -w "$RES" ] || return 0
+  local stamp; stamp="$(/usr/bin/stat -f '%m %z' "$RES/app.asar" 2>/dev/null)"
+  if [ -f "$DECLINED_ADMIN" ] && [ "$(cat "$DECLINED_ADMIN")" = "$stamp" ]; then RC=0; OUT="skipped (you chose Not Now for this copy)"; SKIPPED=1; return 0; fi
+  local c; c="$(ask "vivo Office Kit was installed or reinstalled with vivo's installer, which made it read-only for your account, so the English patch could not be applied.
+
+Apply the English patch now? macOS will ask for your Mac password." "Apply English" "Not Now" "Apply English")"
+  if [ "$c" != "Apply English" ]; then echo "$stamp" > "$DECLINED_ADMIN"; RC=0; OUT="skipped (Not Now)"; SKIPPED=1; return 0; fi
+  log "app is read-only for this user; asking for an administrator password"
+  if [ -n "${VOK_FAKE_ADMIN:-}" ]; then   # test hook: stands in for the password prompt
+    /bin/chmod u+w "$RES"; OUT="$(/usr/bin/perl "$KIT/patcher.pl" install --app "$APP" 2>&1)"; RC=$?; rm -f "$DECLINED_ADMIN"; return 0
+  fi
+  [ -n "${VOK_AUTO:-}" ] && return 0
+  OUT="$(/usr/bin/osascript - "$KIT/patcher.pl" "$APP" <<'OSA' 2>&1
+on run argv
+  return do shell script "/usr/bin/perl " & quoted form of (item 1 of argv) & " install --app " & quoted form of (item 2 of argv) & " 2>&1" with administrator privileges
+end run
+OSA
+)"; RC=$?
+  case "$OUT" in *"User canceled"*|*"-128"*) RC=0; OUT="skipped (password prompt cancelled)"; SKIPPED=1 ;; esac
+  [ $RC -ne 0 ] && case "$OUT" in *"not permitted"*|*"Cannot write"*|*"Could not"*) RC=4 ;; esac
+  rm -f "$DECLINED_ADMIN"
+}
+SKIPPED=""
+
+# Existing helpers were set up before the watch on /Applications was added: add it (takes effect at next login).
+PL="$HOME/Library/LaunchAgents/io.github.jacksonjones2003.vivo-english-watcher.plist"
+if [ -f "$PL" ] && ! /usr/bin/grep -q '<string>/Applications</string>' "$PL"; then
+  /usr/libexec/PlistBuddy -c "Add :WatchPaths: string /Applications" "$PL" >/dev/null 2>&1 && log "watching /Applications from next login (catches full reinstalls)"
+fi
+
 APP="${VOK_APP:-}"
 if [ -z "$APP" ]; then for a in /Applications/pcsuite.app /Applications/pcsuite.localized/pcsuite.app; do [ -d "$a/Contents/Resources" ] && { APP="$a"; break; }; done; fi
 [ -n "$APP" ] && [ -f "$APP/Contents/Resources/app.asar" ] || { log "vivo Office Kit not installed; nothing to do"; exit 0; }
@@ -110,8 +145,9 @@ fi
 if [ -n "$UPDATED" ]; then
   if [ "$STATE" = "patched" ]; then
     # Already English: rebuild it with the new translation (the patcher rebuilds from its backup of the original).
-    OUT="$(/usr/bin/perl "$KIT/patcher.pl" install --app "$APP" 2>&1)"; RC=$?; log "reinstall with $UPDATED rc=$RC: $OUT"
+    do_install; log "reinstall with $UPDATED rc=$RC: $OUT"
     [ $RC -eq 4 ] && { need_permission; exit 4; }
+    [ -n "$SKIPPED" ] && exit 0
     STATE="reinstalled"
   fi
   STATUS="$(/usr/bin/perl "$KIT/patcher.pl" status --app "$APP" 2>&1)"
@@ -140,9 +176,10 @@ if [ "$MODE" = "none" ]; then
   exit 0
 fi
 
-OUT="$(/usr/bin/perl "$KIT/patcher.pl" install --app "$APP" 2>&1)"; RC=$?
+do_install
 log "version ${VER:-?}: install rc=$RC: $OUT"
 if [ $RC -eq 4 ]; then need_permission; exit 4; fi
+[ -n "$SKIPPED" ] && exit 0
 if [ $RC -ne 0 ]; then notify "Reapplying the English patch failed: $OUT"; exit $RC; fi
 
 EXTRA=""
@@ -159,6 +196,6 @@ Restart vivo Office Kit now to see English?" "Restart Now" "Later" "Restart Now"
     /usr/bin/open "$APP"
   fi
 else
-  notify "vivo Office Kit was updated to $VER and the English patch has been reapplied."
+  notify "vivo Office Kit $VER: the English patch has been (re)applied."
 fi
 exit 0

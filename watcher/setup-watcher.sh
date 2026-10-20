@@ -52,6 +52,7 @@ install)
     <string>/Applications/pcsuite.app/Contents</string>
     <string>/Applications/pcsuite.app/Contents/Resources</string>
     <string>/Applications/pcsuite.localized/pcsuite.app/Contents/Resources</string>
+    <string>/Applications</string>
   </array>
   <key>RunAtLoad</key><true/>
   <key>StartInterval</key><integer>21600</integer>
