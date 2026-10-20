@@ -3,7 +3,8 @@
    isExport=true at the moment they start. The connection service reads the same flag, so it is switched
    on just while a helper launches and switched back off afterwards.
    It also adds a line under vivo's "update available" window saying whether an English translation exists
-   for the new version (from latest.json in the patch's GitHub repository). */
+   for the new version (from latest.json in the patch's GitHub repository), and asks the background helper
+   to check for a newer translation each time the app starts. */
 var cp=require("child_process"),fs=require("fs"),path=require("path"),os=require("os"),https=require("https"),el=require("electron");
 var upd=function(fn){try{var p=path.join(el.app.getPath("userData"),"config.json"),d=JSON.parse(fs.readFileSync(p,"utf8")),before=JSON.stringify(d);fn(d);if(JSON.stringify(d)!==before){var tmp=p+".tmp-en";fs.writeFileSync(tmp,JSON.stringify(d,null,"\t"),{mode:fs.statSync(p).mode&511});fs.renameSync(tmp,p)}}catch(e){}};
 var off=function(){upd(function(d){if(d.isExport===true)d.isExport=false})};
@@ -39,5 +40,8 @@ var fetchInfo=function(){try{https.get(STATUS_URL,{timeout:15000},function(r){if
   info={full_versions:m.full_versions.filter(function(v){return typeof v==="string"&&/^[\d.]+$/.test(v)}).slice(0,500),watcher:fs.existsSync(WATCHER)};
   el.webContents.getAllWebContents().forEach(inject)}catch(e){}})}).on("timeout",function(){this.destroy()}).on("error",function(){})}catch(e){}};
 el.app.on("web-contents-created",function(e,wc){wc.on("dom-ready",function(){inject(wc)})});
-el.app.whenReady().then(function(){fetchInfo();setInterval(fetchInfo,6*3600*1000)}).catch(function(){});
+/* Ask the background helper (if installed) to look for a newer translation now that the app has started. */
+var nudge=function(){try{if(!fs.existsSync(WATCHER))return;var d=path.join(os.homedir(),"Library/Application Support/vivo-office-kit-english-watcher");if(!fs.existsSync(d))return;fs.writeFileSync(path.join(d,"launch-request"),String(Date.now()));
+  var c=spawn.call(cp,"/bin/launchctl",["kickstart","gui/"+process.getuid()+"/io.github.jacksonjones2003.vivo-english-watcher"],{stdio:"ignore",detached:true});c.on("error",function(){});c.unref()}catch(e){}};
+el.app.whenReady().then(function(){fetchInfo();setInterval(fetchInfo,6*3600*1000);setTimeout(nudge,15000)}).catch(function(){});
 }catch(e){}})();

@@ -49,17 +49,20 @@ for _ in $(seq 1 24); do
   prev="$cur"; sleep 5
 done
 
-VER="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$APP/Contents/Info.plist" 2>/dev/null)"
+VER=""; [ -f "$APP/Contents/Info.plist" ] && VER="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$APP/Contents/Info.plist" 2>/dev/null)"
 
 # ---------------------------------------------------------------- new translations from GitHub
 # Looks for a newer release of this patch and, only if you click Install, downloads and switches to it.
 REPO_URL="https://github.com/JacksonJones2003/vivo-office-kit-english-mac"
 MANIFEST_URL="${VOK_MANIFEST_URL:-https://raw.githubusercontent.com/JacksonJones2003/vivo-office-kit-english-mac/main/latest.json}"
 STAMP="$W/last-update-check"; DECLINED="$W/declined-version"
+REQ="$W/launch-request"   # written by the patched app when it starts
 maybe_update() {
   local force="$1" now; now=$(date +%s)
-  # Check at most every 12 hours, unless vivo just changed or this version is not fully supported.
-  if [ "$force" != 1 ] && [ -f "$STAMP" ] && [ $((now - $(cat "$STAMP" 2>/dev/null || echo 0))) -lt 43200 ]; then return; fi
+  # Check at most every 12 hours, or every hour when you open vivo Office Kit, unless vivo just changed
+  # or this version is not fully supported.
+  local limit=43200; [ -f "$REQ" ] && { limit=3600; rm -f "$REQ"; }
+  if [ "$force" != 1 ] && [ -f "$STAMP" ] && [ $((now - $(cat "$STAMP" 2>/dev/null || echo 0))) -lt "$limit" ]; then return; fi
   echo "$now" > "$STAMP"
   local mf; mf="$(/usr/bin/curl -fsSL --max-time 20 "$MANIFEST_URL" 2>/dev/null)" || { log "update check: could not reach GitHub"; return; }
   local info; info="$(printf '%s' "$mf" | /usr/bin/perl -MJSON::PP -e '

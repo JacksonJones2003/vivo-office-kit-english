@@ -45,7 +45,8 @@ when the installer asks, it sets up a small background helper:
 - The work is done by a tiny helper app, **vivo English Watcher**, kept in
   `~/Library/Application Support/vivo-office-kit-english-watcher/`. macOS only lets approved apps modify other
   apps, so allow it once under **System Settings > Privacy & Security > App Management** when asked.
-- **New translations arrive as a popup.** About twice a day, and right after vivo updates the app, the helper checks
+- **New translations arrive as a popup.** When you open vivo Office Kit (at most once an hour), about twice a day,
+  and right after vivo updates the app, the helper checks
   this repository's `latest.json` for a newer release of the patch. If there is one, it asks whether to install it.
   Only if you click **Install** does it download the release zip from this repository's Releases page, check it
   against the SHA-256 checksum in `latest.json`, switch to it, and re-patch the app. **Not Now** silences that
