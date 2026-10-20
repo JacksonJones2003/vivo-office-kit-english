@@ -1,7 +1,7 @@
 {
   "version": "1.8.1",
   "zip_url": "https://github.com/JacksonJones2003/vivo-office-kit-english/releases/download/windows-v1.8.1/vivo-office-kit-english-windows-v1.8.1.zip",
-  "zip_sha256": "",
+  "zip_sha256": "448eb01c3c1bff47d4390b4a8b4662c334f65b8e99279924369a9e764f60dfbd",
   "full_versions": ["7.0.5", "7.0.6"],
   "notes": "Test build. Full English for vivo Office Kit 7.0.5 and 7.0.6 for Windows."
 }
