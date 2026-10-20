@@ -222,6 +222,8 @@ STATUS="$(/usr/bin/perl "$KIT/patcher.pl" status --app "$APP" 2>&1)"
 STATE="$(printf '%s\n' "$STATUS" | sed -n 1p)"; MODE="$(printf '%s\n' "$STATUS" | sed -n 3p)"
 INST_MODE="$(sed -n 's/^mode=//p' "$RES/app.asar.english-patch" 2>/dev/null)"   # mode the app is actually patched in
 FORCE=0; [ "$STATE" = "original" ] && FORCE=1; [ "$MODE" != "full" ] && FORCE=1; [ "$INST_MODE" = "basic" ] && FORCE=1
+# "Check for updates" clicked in the app: check now, even if this release was postponed with Not Now.
+if [ -f "$W/manual-request" ]; then rm -f "$W/manual-request"; FORCE=1; log "update check requested from the app"; fi
 maybe_update "$FORCE"
 # Patched in basic mode earlier, but full English is now possible (new translation just downloaded, or already here): upgrade.
 if [ -z "$UPDATED" ] && [ "$STATE" = "patched" ] && [ "$INST_MODE" = "basic" ] && [ "$MODE" = "full" ]; then

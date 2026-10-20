@@ -66,6 +66,17 @@ when the installer asks, it sets up a small background helper:
 To turn it off, run the installer and choose **Restore Chinese**, or run
 `watcher/setup-watcher.sh remove` from this folder. Both remove the helper and its launch monitor.
 
+## Checking for patch updates from inside the app
+
+The main window of the patched app has a small **English patch vX · Check for updates** button in the bottom-right
+corner. Clicking it checks GitHub straight away and shows the result on the button:
+
+- **up to date** – nothing to do;
+- **update available** – with automatic re-patching on, the helper's install popup appears right away; otherwise the
+  download page opens.
+
+Click **×** to hide the button until vivo Office Kit is opened again.
+
 ## Should I install vivo's update?
 
 When vivo Office Kit shows its own **update available** window, the patch adds a line under the version number:
