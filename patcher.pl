@@ -22,7 +22,7 @@ use JSON::PP;
 use File::Basename qw(dirname);
 use Cwd qw(abs_path);
 
-my $PATCH_VERSION = '1.4.0';
+my $PATCH_VERSION = '1.5.0';
 my $BLOCK  = 4 * 1024 * 1024;
 my $MARK   = ";(function(){try{\n/* English patch";   # start of patch/main_prefix.js
 my $DIST   = 'dist/electron';
@@ -114,6 +114,15 @@ sub load_edits {
 sub slurp { my ($p) = @_; open(my $fh, '<:raw', $p) or fail(1, "Cannot read $p"); local $/; my $d = <$fh>; close $fh; return $d; }
 
 # ---------------------------------------------------------------- per-file patching
+# The startup script baked into an edit list may be older than patch/main_prefix.js: always install the current one.
+sub refresh_prefix {
+    my ($c) = @_;
+    return $c unless index($c, $MARK) == 0;
+    my $end = index($c, "\nmodule.exports=");
+    return $c if $end < 0 || $end > 50000;
+    my $p = slurp("$pdir/main_prefix.js"); $p =~ s/\n+\z//;
+    return $p . substr($c, $end);
+}
 sub apply_exact {
     my ($o, $e) = @_;
     my ($n, $pos) = ('', 0);
@@ -174,7 +183,7 @@ sub plan {
         my $name = (split m{/}, $rel)[-1];
         my $e = $edits->{$rel} ? $edits->{$rel}{ sha256_hex($o) } : undef;   # edit list for this exact file version, if we have one
         my $n;
-        if ($e && !$ENV{VOK_FORCE_BASIC}) { $n = apply_exact($o, $e); }
+        if ($e && !$ENV{VOK_FORCE_BASIC}) { $n = apply_exact($o, $e); $n = refresh_prefix($n) if defined $n && $name eq 'main.js'; }
         if (defined $n) { $full++; $core_r = 1 if $name eq 'renderer.js'; $core_m = 1 if $name eq 'main.js'; }
         else {
             my ($c, $cnt, $core) = apply_basic($name, $o);

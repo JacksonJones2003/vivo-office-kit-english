@@ -57,6 +57,18 @@ when the installer asks, it sets up a small background helper:
 To turn it off, run the installer and choose **Restore Chinese**, or run
 `watcher/setup-watcher.sh remove` from this folder.
 
+## Should I install vivo's update?
+
+When vivo Office Kit shows its own **update available** window, the patch adds a line under the version number:
+
+- **✓ English translation ready for 7.0.x** – a full translation for that version has been published. With automatic
+  re-patching on, English comes back by itself after the update.
+- **⚠ No English translation for 7.0.x yet** – updating now will turn parts of the app back to Chinese until a
+  translation is published. You can wait, or update and get a popup once it is available.
+
+To know this, the patched app downloads this repository's small `latest.json` file from GitHub when it starts and
+every 6 hours. Nothing about you or your devices is sent; it is a plain download of that file.
+
 ## Publishing a translation for a new vivo version (maintainers)
 
 1. Build edit lists for the new version and append them to `patch/edits.dat`; bump `$PATCH_VERSION` in `patcher.pl`.
@@ -135,7 +147,7 @@ after. In both modes the rebuilt archive is read back and verified before it rep
 | `patch/edits.dat` | The exact edit lists for 7.0.5 and 7.0.6 (full mode). |
 | `watcher/setup-watcher.sh` | Turns automatic re-patching on or off. |
 | `watcher/reapply.sh` | What the background helper runs after a vivo update, including the update check. |
-| `latest.json` | The newest release of this patch, which the helper checks for updates. |
+| `latest.json` | The newest release of this patch and the vivo versions it fully supports. Read by the helper (updates) and by the patched app (the line under vivo's update window). |
 | `patch/main_prefix.js` | Small startup script added to the app for the mirroring and sign-in language fixes. |
 | `patch/en.lproj/InfoPlist.strings` | English app name, so macOS shows its own windows in English. |
 | `patch/locale_extra.tsv` | English for the strings vivo never translated (used in basic mode). |
