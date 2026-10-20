@@ -98,7 +98,33 @@ if [ $RC -ne 0 ]; then say_msg "The patch could not be applied:
 
 $OUT"; exit $RC; fi
 
+WATCH="$DIR/watcher/setup-watcher.sh"
+if [ "$ACTION" = "restore" ]; then
+  # Back to Chinese: stop the watcher too, or it would put English straight back after the next update.
+  [ -x "$WATCH" ] && "$WATCH" remove >/dev/null 2>&1
+  [ -n "$AUTO" ] && { echo "$OUT"; exit 0; }
+  CHOICE="$(ask "$OUT" "Done" "Done")"; exit 0
+fi
 if [ -n "$AUTO" ]; then echo "$OUT"; exit 0; fi
+
+if [ -x "$WATCH" ]; then
+  if [ "$("$WATCH" status)" = "on" ]; then
+    "$WATCH" install >/dev/null 2>&1   # refresh the watcher's copy of the patch
+  else
+    CHOICE="$(ask "$OUT
+
+vivo Office Kit's own updates put it back into Chinese. Reapply the English patch automatically after each update?
+
+This adds a small background helper (\"vivo English Watcher\"). macOS may ask you to allow it under Privacy & Security > App Management; please allow it." "Yes, Keep English" "No" "Yes, Keep English")"
+    if [ "$CHOICE" = "Yes, Keep English" ]; then
+      W_OUT="$("$WATCH" install 2>&1)" || ask "Automatic re-patching could not be turned on:
+
+$W_OUT" "OK" "OK" >/dev/null
+    fi
+    OUT="Done."
+  fi
+fi
+
 CHOICE="$(ask "$OUT
 
 Open vivo Office Kit now?" "Open vivo Office Kit" "Done" "Open vivo Office Kit")"

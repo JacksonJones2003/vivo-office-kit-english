@@ -7,8 +7,8 @@
 #   perl patcher.pl restore [--app /path/to/pcsuite.app]
 #
 # Each file inside the archive is handled on its own:
-#   full  - the file is byte-for-byte the one this patch was built from (7.0.5): the exact,
-#           checksum-verified edit list in patch/edits.dat is applied.
+#   full  - the file is byte-for-byte one this patch was built from (7.0.5 or 7.0.6): the exact,
+#           checksum-verified edit list for that version in patch/edits.dat is applied.
 #   basic - the file differs (another version): the language lock is found by pattern and removed,
 #           which switches the app to vivo's own built-in English. Untested on other versions.
 #
@@ -21,7 +21,7 @@ use JSON::PP;
 use File::Basename qw(dirname);
 use Cwd qw(abs_path);
 
-my $PATCH_VERSION = '1.2.0';
+my $PATCH_VERSION = '1.3.0';
 my $BLOCK  = 4 * 1024 * 1024;
 my $MARK   = ";(function(){try{\n/* English patch";   # start of patch/main_prefix.js
 my $DIST   = 'dist/electron';
@@ -104,7 +104,7 @@ sub load_edits {
     while (my $line = <$df>) {
         chomp $line; next unless length $line;
         my @f = split /\t/, $line, -1;
-        if ($f[0] eq 'F') { $cur = { osha => $f[4], nsize => $f[5], nsha => $f[6], edits => [] }; $by{ $f[1] } = $cur; }
+        if ($f[0] eq 'F') { $cur = { osha => $f[4], nsize => $f[5], nsha => $f[6], edits => [] }; $by{ $f[1] }{ $f[4] } = $cur; }
         elsif ($f[0] eq 'E') { push @{ $cur->{edits} }, [ $f[1], $f[2], $f[3] // '' ]; }
     }
     close $df; return \%by;
@@ -170,9 +170,9 @@ sub plan {
         my $node = node_of($hdr, $rel) or next;
         my $o = read_file($hdr, $node); next unless defined $o;
         my $name = (split m{/}, $rel)[-1];
-        my $e = $edits->{$rel};
+        my $e = $edits->{$rel} ? $edits->{$rel}{ sha256_hex($o) } : undef;   # edit list for this exact file version, if we have one
         my $n;
-        if ($e && !$ENV{VOK_FORCE_BASIC} && sha256_hex($o) eq $e->{osha}) { $n = apply_exact($o, $e); }
+        if ($e && !$ENV{VOK_FORCE_BASIC}) { $n = apply_exact($o, $e); }
         if (defined $n) { $full++; $core_r = 1 if $name eq 'renderer.js'; $core_m = 1 if $name eq 'main.js'; }
         else {
             my ($c, $cnt, $core) = apply_basic($name, $o);

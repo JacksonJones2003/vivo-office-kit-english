@@ -11,6 +11,6 @@ curl -fsSL "https://github.com/$REPO/archive/refs/heads/main.tar.gz" | tar -xz -
 rm -rf "$DEST"
 mkdir -p "$(dirname "$DEST")"
 mv "$TMP"/vivo-office-kit-english-mac-main "$DEST"
-chmod +x "$DEST/install.sh" "$DEST/Install English Patch.command" "$DEST/patcher.pl"
+chmod +x "$DEST/install.sh" "$DEST/Install English Patch.command" "$DEST/patcher.pl" "$DEST/watcher/"*.sh
 echo "Starting the installer (look for a dialog window)..."
 exec "$DEST/install.sh"

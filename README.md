@@ -6,8 +6,8 @@ and the phone mirroring and PC mode windows.
 > [!IMPORTANT]
 > - **This project was made entirely by Claude, an AI model made by Anthropic** — the analysis, the
 >   translations, the installer and this README. No human has reviewed the code or the translations line by line.
-> - **It has only been tested with version 7.0.5 for Apple silicon, China edition**
->   (`pcsuite_setup_v7.0.5-arm64-cn`). **It is not confirmed to work on any other or future release.** On other
+> - **It has only been tested with versions 7.0.5 and 7.0.6 for Apple silicon, China edition**
+>   (`pcsuite_setup_v7.0.x-arm64-cn`). **It is not confirmed to work on any other or future release.** On other
 >   versions the installer falls back to an untested basic mode (see below), and an app update will put the app
 >   back into Chinese until you run the installer again.
 > - It is unofficial and not affiliated with or endorsed by vivo. Use it at your own risk.
@@ -22,8 +22,8 @@ You need the China edition of vivo Office Kit already installed from vivo's own 
 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/JacksonJones2003/vivo-office-kit-english-mac/main/quick-install.sh)"
 ```
 
-A window appears. Click **Install English**, let it quit vivo Office Kit, enter your Mac password if asked,
-then click **Open vivo Office Kit**.
+A window appears. Click **Install English**, let it quit vivo Office Kit, enter your Mac password if asked.
+It then offers to **keep English after vivo updates** (see below). Finally click **Open vivo Office Kit**.
 
 **Or download the zip:** get the zip from the [latest release](https://github.com/JacksonJones2003/vivo-office-kit-english-mac/releases/latest),
 unzip it, then right-click **Install English Patch.command** and choose **Open**. (macOS blocks a plain
@@ -35,9 +35,27 @@ System Settings > Privacy & Security > Open Anyway.)
 macOS protects installed apps from being modified. Open **System Settings > Privacy & Security > App Management**,
 switch on **Terminal**, and run the installer again. The installer offers to open that page for you.
 
+## Staying English after vivo updates
+
+vivo Office Kit updates itself, and each update puts the app back into Chinese. If you answer **Yes, Keep English**
+when the installer asks, it sets up a small background helper:
+
+- A macOS launch agent watches vivo Office Kit's files. When an update replaces them, it waits for the update to
+  finish, reapplies the patch, and offers to restart vivo Office Kit.
+- The work is done by a tiny helper app, **vivo English Watcher**, kept in
+  `~/Library/Application Support/vivo-office-kit-english-watcher/`. macOS only lets approved apps modify other
+  apps, so allow it once under **System Settings > Privacy & Security > App Management** when asked.
+- It only uses the copy of the patch you installed; it never downloads anything by itself. If an update brings a
+  version the patch does not fully support, it uses basic mode and tells you; run the installer again later to pick up
+  newer translations.
+- A log is kept in `~/Library/Logs/vivo-office-kit-english.log`.
+
+To turn it off, run the installer and choose **Restore Chinese**, or run
+`watcher/setup-watcher.sh remove` from this folder.
+
 ## Undo
 
-Run the installer again and click **Restore Chinese**. This puts back vivo's original file, which the
+Run the installer again and click **Restore Chinese**. This also turns off automatic re-patching, and puts back vivo's original file, which the
 patch keeps inside the app as `app.asar.zh-backup`. Reinstalling vivo's own package also undoes everything.
 
 ## Which versions it works on
@@ -46,11 +64,11 @@ The installer looks at each file inside your copy of the app and picks a mode by
 
 | Your copy | Mode | What you get |
 | --- | --- | --- |
-| 7.0.5 (the files match the ones the patch was built from) | **Full** | Everything listed under "What it does". This is the only tested case. |
+| 7.0.5 or 7.0.6 (the files match the ones the patch was built from) | **Full** | Everything listed under "What it does". 7.0.5 was tested in use; 7.0.6 has so far only been checked on a copy of the app. |
 | Any other version where the language lock can still be found | **Basic** | vivo's own built-in English is switched on, plus the sign-in and mirroring fixes where their code is found. Chinese text written directly in the code is left alone, so some screens stay Chinese. **Untested.** |
 | A version where the lock cannot be found | None | The installer says so and changes nothing. |
 
-The 7.0.5 Intel build has not been tested either; if its files are identical to the Apple silicon ones it gets
+The Intel builds have not been tested; if their files are identical to the Apple silicon ones they get
 full mode, otherwise basic mode. The installer tells you which mode it will use before you confirm.
 
 After vivo Office Kit updates itself, just run the installer again.
@@ -103,7 +121,9 @@ after. In both modes the rebuilt archive is read back and verified before it rep
 | `Install English Patch.command` | Double-clickable launcher for the installer. |
 | `install.sh` | The installer dialogs (install, reinstall, restore). |
 | `patcher.pl` | Does the work: `perl patcher.pl status`, `install` or `restore`. |
-| `patch/edits.dat` | The exact edit list for 7.0.5 (full mode). |
+| `patch/edits.dat` | The exact edit lists for 7.0.5 and 7.0.6 (full mode). |
+| `watcher/setup-watcher.sh` | Turns automatic re-patching on or off. |
+| `watcher/reapply.sh` | What the background helper runs after a vivo update. |
 | `patch/main_prefix.js` | Small startup script added to the app for the mirroring and sign-in language fixes. |
 | `patch/en.lproj/InfoPlist.strings` | English app name, so macOS shows its own windows in English. |
 | `patch/locale_extra.tsv` | English for the strings vivo never translated (used in basic mode). |
