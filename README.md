@@ -78,6 +78,9 @@ corner. Clicking it checks GitHub straight away and shows the result on the butt
 Click **–** to shrink it to a small **EN** badge in the same corner (it stays minimized the next time you open the
 app); click the badge to expand it again.
 
+**Settings › Version info** also has an **English patch** section: the installed patch version and mode, which vivo
+versions have a full translation, a **Check for patch updates** button and a link to this GitHub page.
+
 ## Should I install vivo's update?
 
 When vivo Office Kit shows its own **update available** window, the patch adds a line under the version number:
