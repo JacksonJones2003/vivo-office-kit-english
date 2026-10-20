@@ -5,6 +5,7 @@
 #   perl patcher.pl status  [--app /path/to/pcsuite.app]
 #   perl patcher.pl install [--app /path/to/pcsuite.app]
 #   perl patcher.pl restore [--app /path/to/pcsuite.app]
+#   perl patcher.pl version   (version of this patch)
 #
 # Each file inside the archive is handled on its own:
 #   full  - the file is byte-for-byte one this patch was built from (7.0.5 or 7.0.6): the exact,
@@ -21,7 +22,7 @@ use JSON::PP;
 use File::Basename qw(dirname);
 use Cwd qw(abs_path);
 
-my $PATCH_VERSION = '1.3.0';
+my $PATCH_VERSION = '1.4.0';
 my $BLOCK  = 4 * 1024 * 1024;
 my $MARK   = ";(function(){try{\n/* English patch";   # start of patch/main_prefix.js
 my $DIST   = 'dist/electron';
@@ -29,6 +30,7 @@ my @RENDER = ('renderer.js', 'child-window.js', 'module-share-preview.js');
 
 my $here = dirname(abs_path($0));
 my $cmd  = shift(@ARGV) // 'status';
+if ($cmd eq 'version') { print "$PATCH_VERSION\n"; exit 0; }
 my ($app, $pdir) = (undef, "$here/patch");
 while (@ARGV) { my $a = shift @ARGV; if ($a eq '--app') { $app = shift @ARGV } elsif ($a eq '--patch') { $pdir = shift @ARGV } }
 if (!defined $app) { ($app) = grep { -d $_ } ('/Applications/pcsuite.app', '/Applications/pcsuite.localized/pcsuite.app'); }

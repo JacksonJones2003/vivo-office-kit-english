@@ -3,7 +3,7 @@
 # If vivo's updater has put the original Chinese archive back, re-applies the English patch.
 #   reapply.sh          normal run
 #   reapply.sh check    only check that macOS lets the watcher modify the app (triggers the permission prompt)
-# Test hooks: VOK_APP=/path/to/pcsuite.app  VOK_AUTO=1 (no dialogs)
+# Test hooks: VOK_APP=/path/to/pcsuite.app  VOK_AUTO=1 (no dialogs)  VOK_MANIFEST_URL=... (update source)
 set -u
 W="$HOME/Library/Application Support/vivo-office-kit-english-watcher"
 KIT="$W/kit"
@@ -49,9 +49,82 @@ for _ in $(seq 1 24); do
   prev="$cur"; sleep 5
 done
 
+VER="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$APP/Contents/Info.plist" 2>/dev/null)"
+
+# ---------------------------------------------------------------- new translations from GitHub
+# Looks for a newer release of this patch and, only if you click Install, downloads and switches to it.
+REPO_URL="https://github.com/JacksonJones2003/vivo-office-kit-english-mac"
+MANIFEST_URL="${VOK_MANIFEST_URL:-https://raw.githubusercontent.com/JacksonJones2003/vivo-office-kit-english-mac/main/latest.json}"
+STAMP="$W/last-update-check"; DECLINED="$W/declined-version"
+maybe_update() {
+  local force="$1" now; now=$(date +%s)
+  # Check at most every 12 hours, unless vivo just changed or this version is not fully supported.
+  if [ "$force" != 1 ] && [ -f "$STAMP" ] && [ $((now - $(cat "$STAMP" 2>/dev/null || echo 0))) -lt 43200 ]; then return; fi
+  echo "$now" > "$STAMP"
+  local mf; mf="$(/usr/bin/curl -fsSL --max-time 20 "$MANIFEST_URL" 2>/dev/null)" || { log "update check: could not reach GitHub"; return; }
+  local info; info="$(printf '%s' "$mf" | /usr/bin/perl -MJSON::PP -e '
+    my $m = eval { decode_json(join("", <STDIN>)) } or exit 1;
+    print join("\t", map { $_ // "" } $m->{version}, $m->{zip_url}, $m->{zip_sha256}, join(", ", @{ $m->{full_versions} || [] })), "\n";')" || { log "update check: unreadable manifest"; return; }
+  local nv url sha sup; IFS=$'\t' read -r nv url sha sup <<< "$info"
+  local cv; cv="$(/usr/bin/perl "$KIT/patcher.pl" version 2>/dev/null)"
+  local newer; newer="$(/usr/bin/perl -e 'my @a=split /\./,$ARGV[0]; my @b=split /\./,$ARGV[1]; for (0..2) { my $d=($a[$_]//0)<=>($b[$_]//0); if ($d) { print $d>0 ? 1 : 0; exit } } print 0' "$nv" "$cv")"
+  [ "$newer" = 1 ] || { log "update check: patch $cv is current"; return; }
+  case "$url" in "$REPO_URL"/releases/download/*) ;; *) log "update check: refusing unexpected download address"; return ;; esac
+  [ ${#sha} -eq 64 ] || { log "update check: manifest has no checksum"; return; }
+  # Do not nag: after "Not Now", ask again only after 3 days or when vivo's version changes.
+  if [ "$force" != 1 ] && [ -f "$DECLINED" ] && [ "$(sed -n 1p "$DECLINED")" = "$nv" ] && [ $((now - $(sed -n 2p "$DECLINED"))) -lt 259200 ]; then return; fi
+  local extra=""; [ -n "$sup" ] && extra="
+
+It has the full translation for vivo Office Kit $sup."
+  [ -n "$VER" ] && case ", $sup, " in *", $VER, "*) extra="$extra Your version, $VER, is included." ;; esac
+  local c; c="$(ask "A new English translation for vivo Office Kit is available (patch $nv; you have $cv).$extra
+
+Download and install it now? It is downloaded from the project's GitHub page and checked before use." "Install" "Not Now" "Install")"
+  if [ "$c" != "Install" ]; then printf '%s\n%s\n' "$nv" "$now" > "$DECLINED"; log "update $nv declined"; return; fi
+  local tmp; tmp="$(mktemp -d)"
+  if ! /usr/bin/curl -fsSL --max-time 300 -o "$tmp/p.zip" "$url"; then log "update: download failed"; notify "Downloading the new English translation failed. It will be offered again later."; rm -rf "$tmp"; return; fi
+  if [ "$(/usr/bin/shasum -a 256 "$tmp/p.zip" | cut -d' ' -f1)" != "$sha" ]; then log "update: checksum mismatch"; notify "The downloaded translation did not pass its check and was not used."; rm -rf "$tmp"; return; fi
+  /usr/bin/ditto -x -k "$tmp/p.zip" "$tmp/x" 2>/dev/null
+  local d; d="$(ls -d "$tmp"/x/*/ 2>/dev/null | head -1)"
+  if [ -z "$d" ] || [ ! -f "$d/patcher.pl" ] || [ ! -f "$d/patch/edits.dat" ] || ! /usr/bin/perl -c "$d/patcher.pl" >/dev/null 2>&1; then log "update: package incomplete"; rm -rf "$tmp"; return; fi
+  rm -rf "$W/kit.new"; mkdir -p "$W/kit.new"; cp -R "$d/patcher.pl" "$d/patch" "$W/kit.new/" && rm -rf "$W/kit" && mv "$W/kit.new" "$W/kit"
+  [ -f "$d/watcher/reapply.sh" ] && cp "$d/watcher/reapply.sh" "$W/reapply.sh.new" && chmod +x "$W/reapply.sh.new" && mv "$W/reapply.sh.new" "$W/reapply.sh"
+  rm -rf "$tmp" "$DECLINED"
+  log "updated the patch to $nv"
+  UPDATED="$nv"
+}
+
+UPDATED=""
 STATUS="$(/usr/bin/perl "$KIT/patcher.pl" status --app "$APP" 2>&1)"
 STATE="$(printf '%s\n' "$STATUS" | sed -n 1p)"; MODE="$(printf '%s\n' "$STATUS" | sed -n 3p)"
-VER="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$APP/Contents/Info.plist" 2>/dev/null)"
+FORCE=0; [ "$STATE" = "original" ] && FORCE=1; [ "$MODE" != "full" ] && FORCE=1
+maybe_update "$FORCE"
+if [ -n "$UPDATED" ]; then
+  if [ "$STATE" = "patched" ]; then
+    # Already English: rebuild it with the new translation (the patcher rebuilds from its backup of the original).
+    OUT="$(/usr/bin/perl "$KIT/patcher.pl" install --app "$APP" 2>&1)"; RC=$?; log "reinstall with $UPDATED rc=$RC: $OUT"
+    [ $RC -eq 4 ] && { need_permission; exit 4; }
+    STATE="reinstalled"
+  fi
+  STATUS="$(/usr/bin/perl "$KIT/patcher.pl" status --app "$APP" 2>&1)"
+  [ "$STATE" = "reinstalled" ] || STATE="$(printf '%s\n' "$STATUS" | sed -n 1p)"
+  MODE="$(printf '%s\n' "$STATUS" | sed -n 3p)"
+fi
+if [ "$STATE" = "reinstalled" ]; then
+  if /usr/bin/pgrep -f "$APP/Contents/MacOS/pcsuite" >/dev/null 2>&1; then
+    C="$(ask "The new English translation ($UPDATED) has been installed.
+
+Restart vivo Office Kit now to use it?" "Restart Now" "Later" "Restart Now")"
+    if [ "$C" = "Restart Now" ]; then
+      /usr/bin/osascript -e 'tell application id "com.vivo.pcsuite" to quit' >/dev/null 2>&1
+      for _ in $(seq 1 20); do /usr/bin/pgrep -f "$APP/Contents/MacOS/pcsuite" >/dev/null 2>&1 || break; sleep 1; done
+      /usr/bin/open "$APP"
+    fi
+  else
+    notify "The new English translation ($UPDATED) has been installed."
+  fi
+  exit 0
+fi
 if [ "$STATE" != "original" ]; then log "version ${VER:-?}: state=$STATE, nothing to do"; exit 0; fi
 if [ "$MODE" = "none" ]; then
   log "version ${VER:-?}: the patch does not support this version"

@@ -45,13 +45,24 @@ when the installer asks, it sets up a small background helper:
 - The work is done by a tiny helper app, **vivo English Watcher**, kept in
   `~/Library/Application Support/vivo-office-kit-english-watcher/`. macOS only lets approved apps modify other
   apps, so allow it once under **System Settings > Privacy & Security > App Management** when asked.
-- It only uses the copy of the patch you installed; it never downloads anything by itself. If an update brings a
-  version the patch does not fully support, it uses basic mode and tells you; run the installer again later to pick up
-  newer translations.
+- **New translations arrive as a popup.** About twice a day, and right after vivo updates the app, the helper checks
+  this repository's `latest.json` for a newer release of the patch. If there is one, it asks whether to install it.
+  Only if you click **Install** does it download the release zip from this repository's Releases page, check it
+  against the SHA-256 checksum in `latest.json`, switch to it, and re-patch the app. **Not Now** silences that
+  version for three days.
+- If vivo ships a version that no published translation covers yet, the helper applies basic mode straight away and
+  offers the full translation once a matching release is published here.
 - A log is kept in `~/Library/Logs/vivo-office-kit-english.log`.
 
 To turn it off, run the installer and choose **Restore Chinese**, or run
 `watcher/setup-watcher.sh remove` from this folder.
+
+## Publishing a translation for a new vivo version (maintainers)
+
+1. Build edit lists for the new version and append them to `patch/edits.dat`; bump `$PATCH_VERSION` in `patcher.pl`.
+2. Commit, tag and create a GitHub release whose asset is the zipped repository folder.
+3. Update `latest.json` with the new version, the asset's download URL, its SHA-256 and the supported vivo versions,
+   then push. Installed helpers will offer it within about 12 hours, or straight away after a vivo update.
 
 ## Undo
 
@@ -123,7 +134,8 @@ after. In both modes the rebuilt archive is read back and verified before it rep
 | `patcher.pl` | Does the work: `perl patcher.pl status`, `install` or `restore`. |
 | `patch/edits.dat` | The exact edit lists for 7.0.5 and 7.0.6 (full mode). |
 | `watcher/setup-watcher.sh` | Turns automatic re-patching on or off. |
-| `watcher/reapply.sh` | What the background helper runs after a vivo update. |
+| `watcher/reapply.sh` | What the background helper runs after a vivo update, including the update check. |
+| `latest.json` | The newest release of this patch, which the helper checks for updates. |
 | `patch/main_prefix.js` | Small startup script added to the app for the mirroring and sign-in language fixes. |
 | `patch/en.lproj/InfoPlist.strings` | English app name, so macOS shows its own windows in English. |
 | `patch/locale_extra.tsv` | English for the strings vivo never translated (used in basic mode). |

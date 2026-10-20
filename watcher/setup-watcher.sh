@@ -54,6 +54,7 @@ install)
     <string>/Applications/pcsuite.localized/pcsuite.app/Contents/Resources</string>
   </array>
   <key>RunAtLoad</key><true/>
+  <key>StartInterval</key><integer>21600</integer>
   <key>ThrottleInterval</key><integer>30</integer>
   <key>ProcessType</key><string>Background</string>
 </dict>
