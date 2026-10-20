@@ -22,23 +22,30 @@ var PATCH=(function(){try{var m=fs.readFileSync(path.join(process.resourcesPath,
 var info={patch:PATCH,watcher:fs.existsSync(WATCHER),full_versions:null,latest:null};
 var newer=function(a,b){a=String(a||"").split(".");b=String(b||"").split(".");for(var i=0;i<3;i++){var d=(+a[i]||0)-(+b[i]||0);if(d)return d>0}return false};
 /* Runs inside vivo's own windows: (1) a status line under vivo's update window, (2) in the main window, a small
-   "English patch - Check for updates" button in the bottom-right corner. */
+   "English patch - Check for updates" button in the bottom-right corner (minimizes to a small "EN" badge). */
 var PAGE=function(info){
   window.__vokInfo=info;
   if(!window.__vokInit){window.__vokInit=true;
-    var pending=false,hidden=false,busy=false;
-    window.__vokPill=function(text,tone){var p=document.getElementById("vok-patch-pill");if(!p)return;var l=p.firstChild;busy=(tone==="busy");l.textContent=text;
-      l.style.color=tone==="ok"?"#1a8f3c":tone==="warn"?"#c27c0e":tone==="err"?"#c0392b":"";
-      if(tone&&tone!=="busy"){clearTimeout(window.__vokPillT);window.__vokPillT=setTimeout(function(){l.textContent=label();l.style.color=""},15000)}};
+    var pending=false,busy=false,KEY="vokPatchPillMinimized";
+    var isMin=function(){try{return localStorage.getItem(KEY)==="1"}catch(e){return false}};
     var label=function(){var i=window.__vokInfo||{};return "English patch"+(i.patch?" v"+i.patch:"")+" · Check for updates"};
-    var pill=function(){if(hidden||!/\/index\.html$/.test(location.pathname)||!document.body||document.getElementById("vok-patch-pill"))return;
-      var p=document.createElement("div");p.id="vok-patch-pill";
-      p.style.cssText="position:fixed;right:14px;bottom:10px;z-index:2147483000;display:flex;align-items:center;gap:6px;font:11px/1.3 -apple-system,BlinkMacSystemFont,sans-serif;color:#8a8f99;background:rgba(127,127,127,.12);border:1px solid rgba(127,127,127,.18);border-radius:11px;padding:3px 6px 3px 10px;-webkit-user-select:none;user-select:none;backdrop-filter:blur(6px)";
+    window.__vokPill=function(text,tone){var p=document.getElementById("vok-patch-pill");if(!p||isMin())return;var l=p.firstChild;busy=(tone==="busy");l.textContent=text;
+      l.style.color=tone==="ok"?"#1a8f3c":tone==="warn"?"#c27c0e":tone==="err"?"#c0392b":"";
+      if(tone&&tone!=="busy"){clearTimeout(window.__vokPillT);window.__vokPillT=setTimeout(function(){var q=document.getElementById("vok-patch-pill");if(q&&!isMin()){q.firstChild.textContent=label();q.firstChild.style.color=""}},15000)}};
+    var BASE="position:fixed;right:14px;bottom:10px;z-index:2147483000;display:flex;align-items:center;justify-content:center;font:11px/1.3 -apple-system,BlinkMacSystemFont,sans-serif;color:#8a8f99;background:rgba(127,127,127,.12);border:1px solid rgba(127,127,127,.18);-webkit-user-select:none;user-select:none;backdrop-filter:blur(6px);box-sizing:border-box;";
+    /* Draw the button: full ("English patch vX - Check for updates  -") or minimized (a small "EN" badge). */
+    var draw=function(p){var min=isMin();if(p.getAttribute("data-min")===String(min)&&p.firstChild)return;p.setAttribute("data-min",String(min));
+      while(p.firstChild)p.removeChild(p.firstChild);
+      if(min){p.style.cssText=BASE+"width:24px;height:24px;border-radius:12px;padding:0;cursor:pointer;font-weight:600;font-size:9.5px;letter-spacing:.2px";
+        p.textContent="EN";p.title=label().replace(" · "," – ")+" (click to expand)";p.onclick=function(){try{localStorage.setItem(KEY,"0")}catch(e){}draw(p)};return}
+      p.style.cssText=BASE+"gap:6px;border-radius:11px;padding:3px 6px 3px 10px";p.title="";p.onclick=null;
       var l=document.createElement("span");l.textContent=label();l.title="Check GitHub for a newer English translation";l.style.cssText="cursor:pointer;max-width:60vw;white-space:nowrap;overflow:hidden;text-overflow:ellipsis";
       l.onclick=function(){if(busy)return;window.__vokPill("Checking for updates…","busy");console.log("__VOK_CHECK_UPDATES__")};
-      var x=document.createElement("span");x.textContent="×";x.title="Hide until vivo Office Kit is opened again";x.style.cssText="cursor:pointer;font-size:13px;opacity:.7;padding:0 2px";
-      x.onclick=function(){hidden=true;p.remove()};
-      p.appendChild(l);p.appendChild(x);document.body.appendChild(p)};
+      var m=document.createElement("span");m.textContent="–";m.title="Minimize";m.style.cssText="cursor:pointer;font-size:13px;line-height:1;opacity:.7;padding:0 3px";
+      m.onclick=function(ev){ev.stopPropagation();busy=false;try{localStorage.setItem(KEY,"1")}catch(e){}draw(p)};
+      p.appendChild(l);p.appendChild(m)};
+    var pill=function(){if(!/\/index\.html$/.test(location.pathname)||!document.body)return;var p=document.getElementById("vok-patch-pill");
+      if(!p){p=document.createElement("div");p.id="vok-patch-pill";document.body.appendChild(p)}draw(p)};
     var render=function(){pending=false;pill();var i=window.__vokInfo;if(!i||!i.full_versions)return;
       var eds=document.querySelectorAll(".edition");
       for(var k=0;k<eds.length;k++){var ed=eds[k],m=(ed.textContent||"").match(/\d+(?:\.\d+){1,3}/);if(!m||!ed.parentNode)continue;var ver=m[0];
@@ -51,7 +58,7 @@ var PAGE=function(info){
     window.__vokRender=render;
     new MutationObserver(function(){if(!pending){pending=true;setTimeout(render,250)}}).observe(document.documentElement,{childList:true,subtree:true,characterData:true});
   }
-  var p=document.getElementById("vok-patch-pill");if(p&&p.firstChild&&/Check for updates$/.test(p.firstChild.textContent))p.firstChild.textContent="English patch"+(info.patch?" v"+info.patch:"")+" · Check for updates";
+  var p=document.getElementById("vok-patch-pill");if(p){p.removeAttribute("data-min")}
   window.__vokRender();
 };
 var mine=function(wc){try{return !wc.isDestroyed()&&/^file:/.test(wc.getURL())}catch(e){return false}};

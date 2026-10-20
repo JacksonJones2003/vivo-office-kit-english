@@ -75,7 +75,8 @@ corner. Clicking it checks GitHub straight away and shows the result on the butt
 - **update available** – with automatic re-patching on, the helper's install popup appears right away; otherwise the
   download page opens.
 
-Click **×** to hide the button until vivo Office Kit is opened again.
+Click **–** to shrink it to a small **EN** badge in the same corner (it stays minimized the next time you open the
+app); click the badge to expand it again.
 
 ## Should I install vivo's update?
 
