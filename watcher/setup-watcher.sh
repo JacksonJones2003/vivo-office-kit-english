@@ -11,6 +11,17 @@ LABEL="io.github.jacksonjones2003.vivo-english-watcher"
 MLABEL="io.github.jacksonjones2003.vivo-english-monitor"
 PLIST="$HOME/Library/LaunchAgents/$LABEL.plist"
 DOMAIN="gui/$(id -u)"
+# (Re)load a launch agent. Right after "bootout", macOS can briefly refuse "bootstrap" (error 5), so wait and retry.
+reload() {   # reload <label> <plist>
+  /bin/launchctl bootout "$DOMAIN/$1" >/dev/null 2>&1
+  for _ in 1 2 3 4 5 6 7 8 9 10; do /bin/launchctl print "$DOMAIN/$1" >/dev/null 2>&1 || break; sleep 0.5; done
+  for _ in 1 2 3 4 5; do
+    /bin/launchctl bootstrap "$DOMAIN" "$2" >/dev/null 2>&1 && return 0
+    /bin/launchctl print "$DOMAIN/$1" >/dev/null 2>&1 && return 0
+    sleep 1
+  done
+  return 1
+}
 
 case "${1:-}" in
 status)
@@ -66,9 +77,9 @@ install)
 PL
   /usr/bin/plutil -lint "$PLIST" >/dev/null || { echo "Invalid watcher settings file." >&2; exit 1; }
   [ -n "${VOK_NO_LAUNCHD:-}" ] && { echo "(test) watcher files created, not started"; exit 0; }
-  /bin/launchctl bootout "$DOMAIN/$LABEL" >/dev/null 2>&1
-  /bin/launchctl bootstrap "$DOMAIN" "$PLIST" || { echo "Could not start the watcher." >&2; exit 1; }
+  STARTED=1; reload "$LABEL" "$PLIST" || STARTED=0
   /bin/bash "$W/reapply.sh" ensure-monitor   # reminder popups whenever vivo Office Kit is opened unpatched
+  if [ $STARTED = 0 ]; then echo "Could not start the watcher. Log out and back in to start it." >&2; exit 1; fi
   # Ask macOS for the App Management permission now, while you are here, rather than during a future update.
   VOK_MODE=check "$APPLET/Contents/MacOS/applet" >/dev/null 2>&1
   echo "Automatic re-patching is on." ;;

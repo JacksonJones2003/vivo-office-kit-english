@@ -109,7 +109,9 @@ if [ -n "$AUTO" ]; then echo "$OUT"; exit 0; fi
 
 if [ -x "$WATCH" ]; then
   if [ "$("$WATCH" status)" = "on" ]; then
-    "$WATCH" install >/dev/null 2>&1   # refresh the watcher's copy of the patch
+    W_OUT="$("$WATCH" install 2>&1)" || ask "The English patch was installed, but refreshing the automatic re-patching helper reported a problem:
+
+$W_OUT" "OK" "OK" >/dev/null   # refresh the watcher's copy of the patch
   else
     CHOICE="$(ask "$OUT
 

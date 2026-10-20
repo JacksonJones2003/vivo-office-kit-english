@@ -123,8 +123,16 @@ ensure_monitor() {   # the agent that keeps "monitor" running (added in 1.6.0; o
 </dict>
 </plist>
 PLIST
-  /bin/launchctl bootout "gui/$(id -u)/$MLABEL" >/dev/null 2>&1
-  /bin/launchctl bootstrap "gui/$(id -u)" "$MPL" >/dev/null 2>&1 && log "started the launch monitor (reminders when vivo Office Kit is opened)"
+  local d="gui/$(id -u)"
+  /bin/launchctl bootout "$d/$MLABEL" >/dev/null 2>&1
+  for _ in 1 2 3 4 5 6 7 8 9 10; do /bin/launchctl print "$d/$MLABEL" >/dev/null 2>&1 || break; sleep 0.5; done
+  for _ in 1 2 3 4 5; do
+    if /bin/launchctl bootstrap "$d" "$MPL" >/dev/null 2>&1 || /bin/launchctl print "$d/$MLABEL" >/dev/null 2>&1; then
+      log "started the launch monitor (reminders when vivo Office Kit is opened)"; return 0
+    fi
+    sleep 1
+  done
+  log "could not start the launch monitor; it will start at next login"
 }
 if [ "${1:-}" = "ensure-monitor" ]; then ensure_monitor force; exit 0; fi
 if [ "${1:-}" = "monitor" ]; then
@@ -136,7 +144,12 @@ if [ "${1:-}" = "monitor" ]; then
     for a in /Applications/pcsuite.app /Applications/pcsuite.localized/pcsuite.app; do
       p="$(/usr/bin/pgrep -f "^$a/Contents/MacOS/pcsuite( |\$)" 2>/dev/null | head -1)"; [ -n "$p" ] && { pid="$p"; break; }
     done
-    if [ -n "$pid" ] && [ "$pid" != "$last" ]; then last="$pid"; VOK_TRIGGER=launch /bin/bash "$W/reapply.sh"; fi
+    if [ -n "$pid" ] && [ "$pid" != "$last" ]; then
+      last="$pid"
+      # keep the main watcher loaded (it can be left unloaded if a reload failed)
+      /bin/launchctl print "gui/$(id -u)/io.github.jacksonjones2003.vivo-english-watcher" >/dev/null 2>&1 || { [ -f "$PL" ] && /bin/launchctl bootstrap "gui/$(id -u)" "$PL" >/dev/null 2>&1 && log "reloaded the watcher"; }
+      VOK_TRIGGER=launch /bin/bash "$W/reapply.sh"
+    fi
     [ -z "$pid" ] && last=""
     sleep 10
   done
@@ -228,6 +241,14 @@ maybe_update "$FORCE"
 # Patched in basic mode earlier, but full English is now possible (new translation just downloaded, or already here): upgrade.
 if [ -z "$UPDATED" ] && [ "$STATE" = "patched" ] && [ "$INST_MODE" = "basic" ] && [ "$MODE" = "full" ]; then
   UPDATED="$(/usr/bin/perl "$KIT/patcher.pl" version 2>/dev/null)"; log "app was in basic mode; full translation available, upgrading"
+fi
+# The helper already has a newer patch than the one installed in the app (e.g. the installer refreshed the helper but
+# not the app, or an earlier re-patch failed): bring the app up to the helper's version.
+INST_PATCH="$(sed -n 's/^patch=//p' "$RES/app.asar.english-patch" 2>/dev/null)"
+KIT_PATCH="$(/usr/bin/perl "$KIT/patcher.pl" version 2>/dev/null)"
+if [ -z "$UPDATED" ] && [ "$STATE" = "patched" ] && [ -n "$INST_PATCH" ] && [ -n "$KIT_PATCH" ] && \
+   [ "$(/usr/bin/perl -e 'my @a=split /\./,$ARGV[0]; my @b=split /\./,$ARGV[1]; for (0..2) { my $d=($a[$_]//0)<=>($b[$_]//0); if ($d) { print $d>0 ? 1 : 0; exit } } print 0' "$KIT_PATCH" "$INST_PATCH")" = 1 ]; then
+  UPDATED="$KIT_PATCH"; log "app has patch $INST_PATCH, helper has $KIT_PATCH: updating the app"
 fi
 if [ -n "$UPDATED" ]; then
   if [ "$STATE" = "patched" ]; then
