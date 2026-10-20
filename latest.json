@@ -1,7 +1,7 @@
 {
-  "version": "1.5.1",
-  "zip_url": "https://github.com/JacksonJones2003/vivo-office-kit-english-mac/releases/download/v1.5.1/vivo-office-kit-english-mac-v1.5.1.zip",
-  "zip_sha256": "7509dbb3096d090905706e24741ef66bc222baea77ebb38214de9679e102b473",
+  "version": "1.5.2",
+  "zip_url": "https://github.com/JacksonJones2003/vivo-office-kit-english-mac/releases/download/v1.5.2/vivo-office-kit-english-mac-v1.5.2.zip",
+  "zip_sha256": "0a1907635b79057be4223969ff9fcf55e666bbd76ff73987800e2fe6d3825df1",
   "full_versions": ["7.0.5", "7.0.6"],
   "notes": "Full English for vivo Office Kit 7.0.5 and 7.0.6."
 }
