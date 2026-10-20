@@ -1,7 +1,9 @@
-# vivo Office Kit for Mac — English patch
+# vivo Office Kit — English patch for Mac and Windows
 
-Turns the China edition of **vivo Office Kit** (`pcsuite`) for Mac into English: the main app, its menus,
+Turns the China edition of **vivo Office Kit** (`pcsuite`) into English on **Mac** and **Windows**: the main app, its menus,
 and the phone mirroring and PC mode windows.
+
+**Using Windows?** Everything for Windows is in the [`windows`](windows/) folder. See the [Windows README](windows/README.md). The rest of this page is about the Mac version.
 
 > [!IMPORTANT]
 > - **This project was made entirely by Claude, an AI model made by Anthropic** — the analysis, the
@@ -12,14 +14,14 @@ and the phone mirroring and PC mode windows.
 >   back into Chinese until you run the installer again.
 > - It is unofficial and not affiliated with or endorsed by vivo. Use it at your own risk.
 
-## Install
+## Install on Mac
 
 You need the China edition of vivo Office Kit already installed from vivo's own installer.
 
 **Easiest:** open the Terminal app, paste this line and press Return:
 
 ```bash
-/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/JacksonJones2003/vivo-office-kit-english-mac/main/quick-install.sh)"
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/JacksonJones2003/vivo-office-kit-english/main/quick-install.sh)"
 ```
 
 A window appears. Click **Install English**, let it quit vivo Office Kit, enter your Mac password if asked.
