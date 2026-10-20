@@ -100,8 +100,13 @@ Download and install it now? It is downloaded from the project's GitHub page and
 UPDATED=""
 STATUS="$(/usr/bin/perl "$KIT/patcher.pl" status --app "$APP" 2>&1)"
 STATE="$(printf '%s\n' "$STATUS" | sed -n 1p)"; MODE="$(printf '%s\n' "$STATUS" | sed -n 3p)"
-FORCE=0; [ "$STATE" = "original" ] && FORCE=1; [ "$MODE" != "full" ] && FORCE=1
+INST_MODE="$(sed -n 's/^mode=//p' "$RES/app.asar.english-patch" 2>/dev/null)"   # mode the app is actually patched in
+FORCE=0; [ "$STATE" = "original" ] && FORCE=1; [ "$MODE" != "full" ] && FORCE=1; [ "$INST_MODE" = "basic" ] && FORCE=1
 maybe_update "$FORCE"
+# Patched in basic mode earlier, but full English is now possible (new translation just downloaded, or already here): upgrade.
+if [ -z "$UPDATED" ] && [ "$STATE" = "patched" ] && [ "$INST_MODE" = "basic" ] && [ "$MODE" = "full" ]; then
+  UPDATED="$(/usr/bin/perl "$KIT/patcher.pl" version 2>/dev/null)"; log "app was in basic mode; full translation available, upgrading"
+fi
 if [ -n "$UPDATED" ]; then
   if [ "$STATE" = "patched" ]; then
     # Already English: rebuild it with the new translation (the patcher rebuilds from its backup of the original).
