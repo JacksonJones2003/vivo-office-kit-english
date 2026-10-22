@@ -14,12 +14,12 @@
 #
 # `status` prints four lines: state (original|patched|unsupported), app path, mode (full|basic|none), detail.
 # Exit codes: 0 ok, 2 app not found, 3 unsupported build, 4 permission denied, 5 file in use, 1 other error.
-param([Parameter(Position = 0)][string]$Command = 'status', [string]$App, [string]$Patch)
+param([Parameter(Position = 0)][string]$Command = 'status', [string]$App, [string]$Patch, [switch]$Bridge, [switch]$NoBridge)
 Set-StrictMode -Off
 $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName System.Web.Extensions
 
-$PATCH_VERSION = '1.8.2'
+$PATCH_VERSION = '1.9.0'
 $BLOCK  = 4 * 1024 * 1024
 $MARK   = ";(function(){try{`n/* English patch"   # start of patch\main_prefix.js
 $DIST   = 'dist/electron'
@@ -69,6 +69,8 @@ $marker = Join-Path $res 'app.asar.english-patch'
 $vivoOriginal = Join-Path $res 'app.asar.original'      # vivo's installer sometimes leaves its pristine copy here
 $aside  = Join-Path $res 'app.asar.pre-english-patch'   # where a different, unrelated patch is kept if we replace it
 if (-not (Test-Path -LiteralPath $asar)) { Fail 2 "app.asar not found in $res" }
+# The experimental bridge stays on once chosen (reinstalls and the background helper keep it) until -NoBridge.
+$script:BridgeOn = [bool]$Bridge -or ((-not $NoBridge) -and (Test-Path -LiteralPath $marker) -and ((Get-Content -LiteralPath $marker -Raw) -match "(?m)^bridge=1"))
 
 # ---------------------------------------------------------------- archive helpers
 function Read-Exact($fs, [byte[]]$buf, [int]$n) { $g = 0; while ($g -lt $n) { $r = $fs.Read($buf, $g, $n - $g); if ($r -le 0) { return $false }; $g += $r }; return $true }
@@ -205,11 +207,22 @@ function Apply-Basic([string]$name, [string]$c) {
 }
 
 # Decide, for one source archive, what would be changed. Returns @{ mode; detail; files = @(@(rel, node, newdata)) }.
+# Experimental "bridge" (opt-in with -Bridge): vivo Office Kit refuses to start Infinite collaboration while desktop
+# (PC) mode is open, with a check on the PC before the phone is asked. Removing those two checks lets both run at
+# once, so the PC keyboard can reach the phone through Infinite collaboration while desktop mode shows the screen.
+$BRIDGE_FILES = @('127.js', '128.js')
+function Apply-Bridge([string]$name, [string]$c) {
+    if ($BRIDGE_FILES -notcontains $name) { return @($c, 0) }
+    $n = Sub ([ref]$c) "if\(this\.PCModeConnectStatus===$W\.ConnectionStatus\.CONNECTED\)(return window\._log\.info\(`"\[ConnectionModule\]\[KeyMouseCooperationMixin\.ts\]\[(?:clickStartRelay\] [^`"]*|coordinationConfirm\] PCMode connected)`"\),(?:this\.coordinationOpening=!1,)?void\(this\.coordinationBoxState=$W\.ACTION_RESULT_DAILOG_TYPE\.DIALOG_PC_MODE_CONFLICT_KMCS\);)" 'if(!1)${1}'
+    return @($c, $n)
+}
+
 function Plan($hdr) {
     $edits = Load-Edits
     $targets = @{}; foreach ($k in $edits.Keys) { $targets[$k] = 1 }
     foreach ($x in ($RENDER + 'main.js', 'locales-en_US.js')) { $targets["$DIST/$x"] = 1 }
-    $out = New-Object Collections.ArrayList; $full = 0; $basic = 0; $rules = 0; $coreR = $false; $coreM = $false
+    if ($script:BridgeOn) { foreach ($x in $BRIDGE_FILES) { $targets["$DIST/$x"] = 1 } }
+    $out = New-Object Collections.ArrayList; $full = 0; $basic = 0; $rules = 0; $coreR = $false; $coreM = $false; $bridged = 0
     foreach ($rel in ($targets.Keys | Sort-Object)) {
         $node = Node-Of $hdr $rel; if (-not $node) { continue }
         $o = Read-File $hdr $node; if ($null -eq $o) { continue }
@@ -220,15 +233,19 @@ function Plan($hdr) {
         if ($null -ne $n) { $full++; if ($name -eq 'renderer.js') { $coreR = $true }; if ($name -eq 'main.js') { $coreM = $true } }
         else {
             $r = Apply-Basic $name $o
-            if (-not $r[1]) { continue }
-            $n = $r[0]; $basic++; $rules += $r[1]
-            if ($name -eq 'renderer.js' -and $r[2]) { $coreR = $true }; if ($name -eq 'main.js' -and $r[2]) { $coreM = $true }
+            if ($r[1]) {
+                $n = $r[0]; $basic++; $rules += $r[1]
+                if ($name -eq 'renderer.js' -and $r[2]) { $coreR = $true }; if ($name -eq 'main.js' -and $r[2]) { $coreM = $true }
+            }
         }
+        if ($script:BridgeOn) { $b = Apply-Bridge $name $(if ($null -ne $n) { $n } else { $o }); if ($b[1]) { $n = $b[0]; $bridged += $b[1] } }
+        if ($null -eq $n) { continue }
         [void]$out.Add(@($rel, $node, $n))
     }
     $mode = if (-not $coreR) { 'none' } elseif ($basic) { 'basic' } else { 'full' }
     $detail = switch ($mode) { 'none' { 'the language lock was not found in this version' } 'full' { "$full files fully patched" } default { "$full files fully patched, $basic by pattern ($rules changes)" } }
-    return @{ mode = $mode; detail = $detail; files = $out; main_ok = $coreM }
+    if ($script:BridgeOn) { $detail += "; experimental bridge: $bridged checks removed" }
+    return @{ mode = $mode; detail = $detail; files = $out; main_ok = $coreM; bridged = $bridged }
 }
 
 # ---------------------------------------------------------------- work out where we stand
@@ -263,6 +280,7 @@ if ($Command -eq 'restore') {
     if (-not $bak) { Fail 1 "The backup of the original archive is missing. Reinstall vivo Office Kit from vivo's installer to restore it." }
     try { [IO.File]::Replace($backup, $asar, [NullString]::Value) } catch { Fail (Err-Code $_) "Could not restore: $($_.Exception.Message)" }
     Remove-Item -LiteralPath $marker -Force -ErrorAction SilentlyContinue
+    Remove-Item -LiteralPath (Join-Path $res "english-patch-bt-audio.ps1") -Force -ErrorAction SilentlyContinue
     Write-Output "Restored the original Chinese version."; exit 0
 }
 if ($Command -ne 'install') { Fail 1 "Unknown command '$Command'" }
@@ -348,7 +366,9 @@ try {
     if ($code -eq 5) { Fail 5 "vivo Office Kit is still running, so its files are in use. Quit it (including its tray icon) and try again." }
     Fail $code "Could not install the patched archive: $($_.Exception.Message)"
 }
-try { [IO.File]::WriteAllText($marker, "patch=$PATCH_VERSION`nmode=$($plan.mode)`ndetail=$($plan.detail)`nplatform=windows`n", (New-Object Text.UTF8Encoding($false))) } catch {}
+# Helper for "Phone audio on PC" (the patched app runs it from here).
+try { Copy-Item -LiteralPath (Join-Path $Patch "bt-audio.ps1") -Destination (Join-Path $res "english-patch-bt-audio.ps1") -Force -ErrorAction Stop } catch {}
+try { [IO.File]::WriteAllText($marker, "patch=$PATCH_VERSION`nmode=$($plan.mode)`ndetail=$($plan.detail)`nplatform=windows`n$(if ($script:BridgeOn) { "bridge=1`n" })", (New-Object Text.UTF8Encoding($false))) } catch {}
 
 $note = if ($foreign) { ' Another tool had already changed app.asar; that version was kept as app.asar.pre-english-patch and vivo''s untouched copy was used.' } else { '' }
 if ($plan.mode -eq 'full') { Write-Output "English patch installed ($($plan.detail)). The original is kept as a backup.$note" }

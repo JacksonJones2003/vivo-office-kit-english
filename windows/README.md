@@ -46,6 +46,24 @@ vivo Office Kit updates itself, and each update puts the app back into Chinese. 
 
 To turn it off, run the installer and choose **Restore Chinese**, or run `watcher\setup-watcher.ps1 remove`.
 
+## Phone audio on PC (no mirroring)
+
+The patch adds a small **speaker button** to your phone's card in vivo Office Kit, next to **Transfer history** and **Handoff connectivity**. It lets your phone play its sound through this PC over Bluetooth, like a speaker, without mirroring the screen.
+
+- **Turn it on:** click the speaker button. It connects in a few seconds and turns green. Your phone's music, videos and games now play on the PC.
+- **Volume:** click the green button again to open a panel with a **volume slider**. It controls only your phone's sound on the PC, not other apps, and the level is remembered for next time.
+- **Turn it off:** choose **Turn off phone audio** in that panel. Quitting vivo Office Kit also turns it off. Your phone goes back to its own speaker.
+
+Requirements and notes:
+- Your phone must be paired with this PC in Windows Bluetooth settings (Windows 10 2004 or newer).
+- Sound goes to Windows' current output device. If you hear nothing, pick your speakers or headset in the taskbar's sound menu.
+- If your earbuds are connected to the phone, they take priority, so disconnect them first.
+- The phone's own volume buttons don't change the PC volume, because Windows ignores the volume commands phones send. Use the slider. (Android's developer option **Disable absolute volume** makes the phone buttons work, but it changes how volume works for every Bluetooth device, including cars and earbuds.)
+- Phone calls stay on the phone. This is media audio only.
+- Don't use it at the same time as vivo's phone mirroring, which also sends phone sound to the PC.
+
+How it works: Windows has a built-in Bluetooth audio receiver (`AudioPlaybackConnection`). The patch installs a small PowerShell helper next to vivo's files (`resources\english-patch-bt-audio.ps1`) that vivo Office Kit starts when you click the button. The helper sets the volume of the phone's audio stream through Windows' per-app volume controls.
+
 ## Checking for patch updates from inside the app
 
 The patched app's main window has a small **English patch vX · Check for updates** button in the bottom-right corner. Click **–** to shrink it to a small **EN** badge. **Settings › Version info** has an **English patch** section. These work as in the Mac version.
@@ -75,4 +93,5 @@ Run the installer again and click **Restore Chinese**. This also turns off autom
   1. Bump `PATCH_VERSION` in `patcher.ps1`.
   2. Zip the `windows` folder and attach it to a GitHub release tagged `windows-vX.Y.Z`. Untick **Set as the latest release**, because installed Mac apps link to the latest release.
   3. Put the asset's URL and SHA-256 into `windows/latest.json`, then push.
+- **Experimental, off by default:** `patcher.ps1 install -Bridge` removes vivo's PC-side check that stops Infinite collaboration from running alongside desktop mode. `-NoBridge` turns it off again. It doesn't make typing work in desktop mode, because the phone sends Infinite collaboration keystrokes to its own screen.
 - **Mac and Windows never take each other's updates.** Mac helpers read the root `latest.json` and only accept downloads from `…/vivo-office-kit-english-mac/releases/download/`. Windows helpers read `windows/latest.json` and only accept `…/releases/download/windows-v…`.

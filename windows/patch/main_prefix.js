@@ -85,7 +85,68 @@ var PAGE=function(info){
         (i.watcher?" Reapplied automatically after vivo updates.":" Automatic re-patching is off.");
       var T=document.getElementById("vok-settings-title"),D=document.getElementById("vok-settings-detail");
       if(T.textContent!==title)T.textContent=title;if(D.textContent!==det.trim())D.textContent=det.trim()};
-    var render=function(){pending=false;pill();settings();var i=window.__vokInfo;if(!i||!i.full_versions)return;
+    /* "Phone audio": a compact speaker button in the phone card, next to "Transfer history" and "Handoff
+       connectivity". It is a copy of vivo's own button (same classes and the card's scoped-style attribute), so vivo's
+       stylesheet styles it like the others. Off: click to play the phone's sound on this PC over Bluetooth, without
+       mirroring the screen. On (green): click for a panel with a volume slider for the phone's sound and Turn off.
+       Clicks go to the main process as console messages; it answers through window.__vokAudio(state). */
+    var audioPill=function(){try{var rows=document.querySelectorAll(".buttom-btns-left");
+      var a=window.__vokAudioState||{state:"off"},send=function(c){console.log("__VOK_AUDIO__"+c)};
+      var key=JSON.stringify({s:a.state,n:a.name,e:a.error,d:a.devices});
+      for(var r=0;r<rows.length;r++){var row=rows[r],b=row.querySelector(".vok-audio-btn");
+        if(!b){var ref=row.querySelector(".buttom-btn"),refText=ref&&ref.querySelector(".buttom-btn-text");if(!ref||!refText)continue;
+          var scoped=[].slice.call(ref.attributes).filter(function(x){return x.name.indexOf("data-v-")===0});
+          b=ref.cloneNode(false);b.classList.add("vok-audio-btn");b.removeAttribute("id");b.style.cssText+=";flex:none;width:28px;min-width:28px;padding:0";
+          var ns="http://www.w3.org/2000/svg",svg=document.createElementNS(ns,"svg");scoped.forEach(function(x){svg.setAttribute(x.name,x.value)});
+          svg.setAttribute("class","svg-icon");svg.setAttribute("viewBox","0 0 24 24");svg.setAttribute("fill","none");svg.setAttribute("stroke","currentColor");
+          svg.setAttribute("stroke-width","1.8");svg.setAttribute("stroke-linecap","round");svg.setAttribute("stroke-linejoin","round");svg.style.cssText="display:block;width:16px;height:16px;min-width:16px";
+          ["M4 9.5h3.5L12 5.5v13l-4.5-4H4z","M15.5 9a4 4 0 0 1 0 6","M18 6.5a7.5 7.5 0 0 1 0 11"].forEach(function(d){var pth=document.createElementNS(ns,"path");pth.setAttribute("d",d);svg.appendChild(pth)});
+          b.appendChild(svg);var t0=refText.cloneNode(false);t0.style.display="none";t0.textContent="Phone audio";b.appendChild(t0);
+          b.onclick=function(ev){ev.stopPropagation();var s=(window.__vokAudioState||{}).state;if(s==="searching"||s==="connecting")return;
+            if(s==="on"){if(document.querySelector(".vok-audio-panel"))return closePanel();return openPanel(this)}send("toggle")};
+          row.appendChild(b)}
+        var on=a.state==="on",busy=a.state==="searching"||a.state==="connecting";
+        var pct=typeof a.volume==="number"&&a.volume>=0?Math.round(a.volume*100):null;
+        b.title=a.state==="searching"?"Phone audio: looking for your phone…":a.state==="connecting"?"Phone audio: connecting to "+a.name+"…":
+          on?"Phone audio is on: "+a.name+" plays through this PC"+(pct!==null?" at "+pct+"%":"")+". Click for volume or to turn it off.":
+          a.state==="error"?"Phone audio: "+a.error+" Click to try again.":"Phone audio: play your phone's sound through this PC over Bluetooth, without mirroring the screen";
+        if(b.getAttribute("data-k")===key)continue;b.setAttribute("data-k",key);
+        var col=on?"#1a8f3c":a.state==="error"?"#c0392b":"";b.querySelector("svg").style.color=col;b.style.opacity=busy?".5":"";
+        b.style.borderColor=on?"rgba(26,143,60,.45)":"";b.style.cursor=busy?"default":"";
+        if(!on)closePanel();
+        var old=document.querySelector(".vok-audio-menu");if(old)old.parentNode.removeChild(old);
+        if(a.state==="choose"&&a.devices){var m=floating(b,"vok-audio-menu");m.style.padding="6px 0";
+          var item=function(label,fn,dim){var d=document.createElement("div");d.textContent=label;d.style.cssText="padding:6px 14px;cursor:pointer;white-space:nowrap"+(dim?";opacity:.6":"");d.onmouseenter=function(){d.style.background="rgba(127,127,127,.12)"};d.onmouseleave=function(){d.style.background=""};d.onclick=function(ev){ev.stopPropagation();fn()};m.appendChild(d)};
+          var head=document.createElement("div");head.textContent="Play audio from:";head.style.cssText="padding:4px 14px 6px;opacity:.6";m.appendChild(head);
+          a.devices.forEach(function(dv,i){item(dv.name,function(){send("pick:"+i)})});item("Cancel",function(){send("stop")},!0)}}
+      var vs=document.querySelector(".vok-audio-panel input[type=range]");
+      if(vs&&!vs.__drag&&typeof a.volume==="number"&&a.volume>=0){vs.value=Math.round(a.volume*100);vs.oninput&&vs.__label&&(vs.__label.textContent=vs.value+"%")}}catch(e){}};
+    /* A small panel anchored under the button (fixed position, so the card's layout is untouched). */
+    var floating=function(btn,cls){var q=btn.getBoundingClientRect(),m=document.createElement("div");m.className=cls;
+      m.style.cssText="position:fixed;top:"+Math.round(q.bottom+6)+"px;left:"+Math.round(Math.max(8,q.right-220))+"px;width:220px;box-sizing:border-box;z-index:3000;border-radius:10px;"+
+        "background:var(--color-bg-1,#fff);color:var(--connection-device-detail-buttom-btn-color,#222);box-shadow:0 6px 24px rgba(0,0,0,.18);border:1px solid rgba(127,127,127,.18);"+
+        "font:12px/1.4 \"Segoe UI\",sans-serif;text-align:left";m.onclick=function(ev){ev.stopPropagation()};document.body.appendChild(m);return m};
+    var closePanel=function(){var p=document.querySelector(".vok-audio-panel");if(p)p.parentNode.removeChild(p);document.removeEventListener("mousedown",outside,true)};
+    var outside=function(ev){var p=document.querySelector(".vok-audio-panel");if(p&&!p.contains(ev.target)&&!(ev.target.closest&&ev.target.closest(".vok-audio-btn")))closePanel()};
+    var openPanel=function(btn){closePanel();var a=window.__vokAudioState||{},send=function(c){console.log("__VOK_AUDIO__"+c)};
+      var p=floating(btn,"vok-audio-panel");p.style.padding="12px 14px";
+      var h=document.createElement("div");h.textContent=(a.name||"Phone")+" audio";h.style.cssText="font-weight:600;margin-bottom:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis";p.appendChild(h);
+      var row=document.createElement("div");row.style.cssText="display:flex;align-items:center;gap:8px";
+      var lo=document.createElementNS("http://www.w3.org/2000/svg","svg");lo.setAttribute("viewBox","0 0 24 24");lo.setAttribute("fill","none");lo.setAttribute("stroke","currentColor");lo.setAttribute("stroke-width","1.8");lo.setAttribute("stroke-linejoin","round");lo.style.cssText="width:14px;height:14px;flex:none;opacity:.7";
+      var lp=document.createElementNS("http://www.w3.org/2000/svg","path");lp.setAttribute("d","M4 9.5h3.5L12 5.5v13l-4.5-4H4z");lo.appendChild(lp);row.appendChild(lo);
+      var s=document.createElement("input");s.type="range";s.min="0";s.max="100";s.step="1";s.style.cssText="flex:1;min-width:0;accent-color:#3a7afe;cursor:pointer";
+      s.value=typeof a.volume==="number"&&a.volume>=0?Math.round(a.volume*100):100;
+      var lab=document.createElement("span");lab.style.cssText="width:34px;text-align:right;font-variant-numeric:tabular-nums;opacity:.8";lab.textContent=s.value+"%";s.__label=lab;
+      var last=0,pendingV=null,flush=function(){if(pendingV!==null){send("vol:"+(pendingV/100));pendingV=null;last=Date.now()}};
+      s.oninput=function(){lab.textContent=s.value+"%";pendingV=+s.value;if(Date.now()-last>60)flush();else setTimeout(flush,70)};
+      s.onpointerdown=function(){s.__drag=true};s.onpointerup=s.onchange=function(){s.__drag=false;flush()};
+      row.appendChild(s);row.appendChild(lab);p.appendChild(row);
+      var note=document.createElement("div");note.textContent="Controls only your phone's sound on this PC.";note.style.cssText="margin-top:6px;font-size:11px;opacity:.55";p.appendChild(note);
+      var off=document.createElement("div");off.textContent="Turn off phone audio";off.style.cssText="margin-top:10px;padding-top:8px;border-top:1px solid rgba(127,127,127,.18);color:#c0392b;cursor:pointer";
+      off.onclick=function(){closePanel();send("toggle")};p.appendChild(off);
+      document.addEventListener("mousedown",outside,true)};
+    window.__vokAudio=function(s){window.__vokAudioState=s;audioPill()};
+    var render=function(){pending=false;pill();settings();audioPill();var i=window.__vokInfo;if(!i||!i.full_versions)return;
       var eds=document.querySelectorAll(".edition");
       for(var k=0;k<eds.length;k++){var ed=eds[k],m=(ed.textContent||"").match(/\d+(?:\.\d+){1,3}/);if(!m||!ed.parentNode)continue;var ver=m[0];
         var box=ed.parentNode,line=box.querySelector(".vok-en-status");
@@ -116,8 +177,39 @@ var manualCheck=function(wc){fetchInfo(function(ok){
   if(wake("manual-request"))return pill(wc,"Update v"+info.latest+" available. Follow the popup to install it.","warn");
   try{el.shell.openExternal(info.latest?"https://github.com/JacksonJones2003/vivo-office-kit-english/releases/tag/windows-v"+info.latest:RELEASES_URL)}catch(e){}
   pill(wc,"Update v"+info.latest+" available. Opened the download page.","warn")})};
-el.app.on("web-contents-created",function(e,wc){wc.on("dom-ready",function(){inject(wc)});wc.on("console-message",function(ev,level,msg){if(!mine(wc))return;
-  if(msg==="__VOK_CHECK_UPDATES__")manualCheck(wc);else if(msg==="__VOK_OPEN_GITHUB__"){try{el.shell.openExternal(REPO_URL)}catch(e){}}})});
+/* "Phone audio on PC": the PC becomes a Bluetooth speaker for the phone, using Windows' own receiver through a small
+   PowerShell helper (resources\english-patch-bt-audio.ps1, installed by the patch). The helper keeps the connection
+   open and reports its state as JSON lines; it ends when vivo Office Kit quits. */
+var VOLF=path.join(el.app.getPath("userData"),"english-patch-audio.json");
+var savedVol=function(){try{var v=JSON.parse(fs.readFileSync(VOLF,"utf8")).volume;return typeof v==="number"&&v>=0&&v<=1?v:null}catch(e){return null}};
+var audio={state:"off",name:"",error:"",devices:null,volume:savedVol()},aproc=null;
+var BT_PS=path.join(process.resourcesPath,"english-patch-bt-audio.ps1");
+var PS_EXE=path.join(process.env.SystemRoot||"C:\\Windows","System32","WindowsPowerShell","v1.0","powershell.exe");
+var runBt=function(env){return spawn.call(cp,PS_EXE,["-NoProfile","-NonInteractive","-ExecutionPolicy","Bypass","-WindowStyle","Hidden","-File",BT_PS],{env:Object.assign({},process.env,env),windowsHide:true,stdio:["pipe","pipe","ignore"]})};
+var pushAudio=function(wcs){(wcs||el.webContents.getAllWebContents()).forEach(function(wc){try{if(mine(wc))wc.executeJavaScript("window.__vokAudio&&window.__vokAudio("+JSON.stringify(audio)+")",true).catch(function(){})}catch(e){}})};
+var setAudio=function(s){for(var k in s)audio[k]=s[k];pushAudio()};
+var readLines=function(p,cb){var buf="";p.stdout.setEncoding("utf8");p.stdout.on("data",function(d){buf+=d;var i;while((i=buf.indexOf("\n"))>=0){var l=buf.slice(0,i).trim();buf=buf.slice(i+1);if(l){try{cb(JSON.parse(l))}catch(e){}}}})};
+var audioStop=function(quiet){if(aproc){var p=aproc;aproc=null;try{p.kill()}catch(e){}}if(!quiet)setAudio({state:"off",devices:null,error:""})};
+var audioConnect=function(dev){audioStop(true);setAudio({state:"connecting",name:dev.name,error:"",devices:null});
+  var env={VOK_BT_MODE:"connect",VOK_BT_ID:dev.id,VOK_BT_PARENT:String(process.pid)};if(typeof audio.volume==="number")env.VOK_BT_VOLUME=String(audio.volume);
+  var p=aproc=runBt(env);
+  readLines(p,function(m){if(aproc!==p)return;if(m.state==="connected")setAudio({state:"on"});else if(m.state==="closed")setAudio({state:"off"});else if(m.state==="volume"&&typeof m.volume==="number"&&m.volume>=0)setAudio({volume:m.volume});else if(m.state==="error")setAudio({state:"error",error:m.error||"Could not connect."})});
+  p.on("exit",function(){if(aproc===p){aproc=null;if(audio.state==="on"||audio.state==="connecting")setAudio({state:"off"})}});
+  p.on("error",function(){if(aproc===p){aproc=null;setAudio({state:"error",error:"Could not start the audio helper."})}})};
+var audioToggle=function(){if(audio.state==="on"||audio.state==="connecting")return audioStop();
+  if(!fs.existsSync(BT_PS))return setAudio({state:"error",error:"Run the English patch installer again to add phone audio."});
+  setAudio({state:"searching",error:"",devices:null});var p=runBt({VOK_BT_MODE:"list"}),got=false;
+  readLines(p,function(m){got=true;var d=(m&&m.devices)||[];
+    if(!d.length)return setAudio({state:"error",error:"No paired phone found. Pair your phone with this PC in Windows Bluetooth settings first."});
+    if(d.length===1)return audioConnect(d[0]);setAudio({state:"choose",devices:d})});
+  p.on("exit",function(){if(!got&&audio.state==="searching")setAudio({state:"error",error:"Could not check Bluetooth. Is Bluetooth on?"})});
+  p.on("error",function(){setAudio({state:"error",error:"Could not start the audio helper."})})};
+var audioVolume=function(v){v=Math.max(0,Math.min(1,+v));if(isNaN(v))return;audio.volume=v;try{fs.writeFileSync(VOLF,JSON.stringify({volume:v}))}catch(e){}
+  if(aproc&&aproc.stdin&&!aproc.stdin.destroyed){try{aproc.stdin.write("vol "+v.toFixed(3)+"\n")}catch(e){}}};
+var audioMsg=function(c){if(c==="toggle")audioToggle();else if(c.indexOf("vol:")===0)audioVolume(c.slice(4));else if(c==="stop")audioStop();else if(c.indexOf("pick:")===0){var d=audio.devices&&audio.devices[+c.slice(5)];if(d)audioConnect(d)}};
+el.app.on("before-quit",function(){audioStop(true)});
+el.app.on("web-contents-created",function(e,wc){wc.on("dom-ready",function(){inject(wc);pushAudio([wc])});wc.on("console-message",function(ev,level,msg){if(!mine(wc))return;
+  if(typeof msg==="string"&&msg.indexOf("__VOK_AUDIO__")===0)audioMsg(msg.slice(13));else if(msg==="__VOK_CHECK_UPDATES__")manualCheck(wc);else if(msg==="__VOK_OPEN_GITHUB__"){try{el.shell.openExternal(REPO_URL)}catch(e){}}})});
 /* Ask the background helper (if installed) to look for a newer translation now that the app has started. */
 var nudge=function(){wake("launch-request")};
 el.app.whenReady().then(function(){fetchInfo();setInterval(fetchInfo,6*3600*1000);setTimeout(nudge,15000)}).catch(function(){});
