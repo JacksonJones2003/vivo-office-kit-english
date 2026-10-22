@@ -1,7 +1,8 @@
 ;(function(){try{
 /* English patch: the phone-mirroring and PC-mode helper apps (vivoScreen.exe, PCMode.exe) only load English when
    config.json has isExport=true at the moment they start. The connection service reads the same flag, so it is
-   switched on just while a helper launches and switched back off afterwards.
+   switched on just while a helper launches (by this app, or by the other helper when switching between phone
+   mirroring and desktop mode) and switched back off afterwards.
    It also adds a line under vivo's "update available" window saying whether an English translation exists
    for the new version (from latest.json in the patch's GitHub repository), adds a "Check for updates" button to
    the main window, and asks the background helper to check for a newer translation each time the app starts. */
@@ -11,7 +12,14 @@ var off=function(){upd(function(d){if(d.isExport===true)d.isExport=false})};
 var timer=null,spawn=cp.spawn;
 var english=function(){upd(function(d){if(d.isExport===true&&!timer)d.isExport=false;d.currentLanguage="en_US";d.isRtl=false})};
 english();[2000,8000,20000,60000].forEach(function(ms){setTimeout(english,ms)});
-cp.spawn=function(cmd){try{if(typeof cmd==="string"&&/[\\\/](vivoScreen|vScreen|PCMode)(\.exe)?$/i.test(cmd)){upd(function(d){d.isExport=true;d.currentLanguage="en_US";d.isRtl=false});clearTimeout(timer);timer=setTimeout(function(){timer=null;off()},12000)}}catch(e){}return spawn.apply(this,arguments)};
+var helperStarting=function(){upd(function(d){d.isExport=true;d.currentLanguage="en_US";d.isRtl=false});clearTimeout(timer);timer=setTimeout(function(){timer=null;off()},12000)};
+cp.spawn=function(cmd){try{if(typeof cmd==="string"&&/[\\\/](vivoScreen|vScreen|PCMode)(\.exe)?$/i.test(cmd))helperStarting()}catch(e){}return spawn.apply(this,arguments)};
+/* Switching between phone mirroring and desktop mode from inside those windows starts the other helper directly,
+   not through this app. The app is told with a "switch_app_action" message, which it logs before acting on it,
+   a moment before the new helper reads its language: switch English on at that point too. */
+var hookLog=function(){try{var L=global.__log;if(!L||typeof L.info!=="function"||L.info.__vok)return;var info=L.info;
+  L.info=function(m){try{if(typeof m==="string"&&m.indexOf("switch_app_action")>=0)helperStarting()}catch(e){}return info.apply(this,arguments)};L.info.__vok=true}catch(e){}};
+setInterval(hookLog,500);
 el.app.on("before-quit",function(){clearTimeout(timer);timer=null;off()});
 
 var STATUS_URL="https://raw.githubusercontent.com/JacksonJones2003/vivo-office-kit-english/main/windows/latest.json";

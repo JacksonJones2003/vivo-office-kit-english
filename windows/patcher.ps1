@@ -19,7 +19,7 @@ Set-StrictMode -Off
 $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName System.Web.Extensions
 
-$PATCH_VERSION = '1.8.1'
+$PATCH_VERSION = '1.8.2'
 $BLOCK  = 4 * 1024 * 1024
 $MARK   = ";(function(){try{`n/* English patch"   # start of patch\main_prefix.js
 $DIST   = 'dist/electron'
