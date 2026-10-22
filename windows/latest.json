@@ -1,7 +1,7 @@
 {
-  "version": "1.8.1",
-  "zip_url": "https://github.com/JacksonJones2003/vivo-office-kit-english/releases/download/windows-v1.8.1/vivo-office-kit-english-windows-v1.8.1.zip",
-  "zip_sha256": "448eb01c3c1bff47d4390b4a8b4662c334f65b8e99279924369a9e764f60dfbd",
+  "version": "1.8.2",
+  "zip_url": "https://github.com/JacksonJones2003/vivo-office-kit-english/releases/download/windows-v1.8.2/vivo-office-kit-english-windows-v1.8.2.zip",
+  "zip_sha256": "77824073a1a9a0bda7f76dbcf7a4b5b25700882c7adcff012539f0cd0d795431",
   "full_versions": ["7.0.5", "7.0.6"],
-  "notes": "Test build. Full English for vivo Office Kit 7.0.5 and 7.0.6 for Windows."
+  "notes": "Test build. English desktop mode when switching from phone mirroring. Full English for vivo Office Kit 7.0.5 and 7.0.6 for Windows."
 }
