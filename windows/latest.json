@@ -1,7 +1,7 @@
 {
-  "version": "1.8.2",
-  "zip_url": "https://github.com/JacksonJones2003/vivo-office-kit-english/releases/download/windows-v1.8.2/vivo-office-kit-english-windows-v1.8.2.zip",
-  "zip_sha256": "77824073a1a9a0bda7f76dbcf7a4b5b25700882c7adcff012539f0cd0d795431",
+  "version": "1.9.0",
+  "zip_url": "https://github.com/JacksonJones2003/vivo-office-kit-english/releases/download/windows-v1.9.0/vivo-office-kit-english-windows-v1.9.0.zip",
+  "zip_sha256": "5c3334dbc6fe6f4067e525ca977f0792d9ec8fbda839f78571f4fd7d536b89f6",
   "full_versions": ["7.0.5", "7.0.6"],
-  "notes": "Test build. English desktop mode when switching from phone mirroring. Full English for vivo Office Kit 7.0.5 and 7.0.6 for Windows."
+  "notes": "Test build. New: Phone audio on PC (play your phone's sound through the PC over Bluetooth, with a volume slider). Full English for vivo Office Kit 7.0.5 and 7.0.6 for Windows."
 }
