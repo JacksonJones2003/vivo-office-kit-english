@@ -1,7 +1,7 @@
 {
-  "version": "1.9.0",
-  "zip_url": "https://github.com/JacksonJones2003/vivo-office-kit-english/releases/download/windows-v1.9.0/vivo-office-kit-english-windows-v1.9.0.zip",
-  "zip_sha256": "5c3334dbc6fe6f4067e525ca977f0792d9ec8fbda839f78571f4fd7d536b89f6",
+  "version": "1.10.0",
+  "zip_url": "https://github.com/JacksonJones2003/vivo-office-kit-english/releases/download/windows-v1.10.0/vivo-office-kit-english-windows-v1.10.0.zip",
+  "zip_sha256": "95381cc5da81cb5b0f9af1cee0cc3f7382127db41cc3bf6b4ded5ba8166aaad3",
   "full_versions": ["7.0.5", "7.0.6"],
-  "notes": "Test build. New: Phone audio on PC (play your phone's sound through the PC over Bluetooth, with a volume slider). Full English for vivo Office Kit 7.0.5 and 7.0.6 for Windows."
+  "notes": "Test build. New: lossless Wi-Fi phone audio (via scrcpy by Genymobile) alongside Bluetooth. Full English for vivo Office Kit 7.0.5 and 7.0.6 for Windows."
 }
