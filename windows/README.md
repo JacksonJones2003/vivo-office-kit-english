@@ -48,21 +48,42 @@ To turn it off, run the installer and choose **Restore Chinese**, or run `watche
 
 ## Phone audio on PC (no mirroring)
 
-The patch adds a small **speaker button** to your phone's card in vivo Office Kit, next to **Transfer history** and **Handoff connectivity**. It lets your phone play its sound through this PC over Bluetooth, like a speaker, without mirroring the screen.
+The patch adds a small **speaker button** to your phone's card in vivo Office Kit, next to **Transfer history** and **Handoff connectivity**. It plays your phone's sound through this PC, like a speaker, without mirroring the screen. It can connect two ways:
 
-- **Turn it on:** click the speaker button. It connects in a few seconds and turns green. Your phone's music, videos and games now play on the PC.
-- **Volume:** click the green button again to open a panel with a **volume slider**. It controls only your phone's sound on the PC, not other apps, and the level is remembered for next time.
+- **Bluetooth** works as soon as your phone is paired with this PC. Bluetooth audio is always compressed.
+- **Wi-Fi (lossless)** sends the sound over your home network as lossless FLAC, so it can sound better than Bluetooth. It uses [scrcpy](https://github.com/Genymobile/scrcpy) by Genymobile (see Credits).
+
+How to use it:
+- **Turn it on:** click the speaker button. It connects in a few seconds and turns green.
+- **Volume and settings:** click the green button again to open a panel. It has:
+  - a **volume slider** for your phone's sound on the PC only, not other apps;
+  - **Sound via: Bluetooth | Wi-Fi (lossless)**;
+  - for Wi-Fi, **Also play on the phone**.
+
+  Changing a setting reconnects. All of them are remembered.
 - **Turn it off:** choose **Turn off phone audio** in that panel. Quitting vivo Office Kit also turns it off. Your phone goes back to its own speaker.
 
-Requirements and notes:
+Notes for **Bluetooth**:
 - Your phone must be paired with this PC in Windows Bluetooth settings (Windows 10 2004 or newer).
-- Sound goes to Windows' current output device. If you hear nothing, pick your speakers or headset in the taskbar's sound menu.
 - If your earbuds are connected to the phone, they take priority, so disconnect them first.
 - The phone's own volume buttons don't change the PC volume, because Windows ignores the volume commands phones send. Use the slider. (Android's developer option **Disable absolute volume** makes the phone buttons work, but it changes how volume works for every Bluetooth device, including cars and earbuds.)
+
+Notes for **Wi-Fi**:
+- **One-time download:** the first time you choose Wi-Fi, the patch downloads the official scrcpy release (about 11 MB) from scrcpy's GitHub page. It checks the download against its published checksum before using it.
+- **Debugging access:** your phone must allow debugging from this PC over the network. If the phone is plugged in by USB, the patch sets this up automatically. If the phone asks to **Allow debugging** from this computer, tap **Allow**, then **Always allow**. If Wi-Fi audio says the phone isn't accepting connections, plug the phone into the PC with a USB cable once and try again.
+- **Requirements:** the phone and PC must be on the same network, and the phone needs Android 11 or newer.
+- **Apps can opt out:** some apps block their audio from being captured, and their sound won't come through.
+- **Separate from vivo:** Wi-Fi audio runs its own copy of Android's `adb` on its own port, so it doesn't interfere with vivo Office Kit.
+
+For both:
+- Sound goes to Windows' current output device. If you hear nothing, pick your speakers or headset in the taskbar's sound menu.
 - Phone calls stay on the phone. This is media audio only.
 - Don't use it at the same time as vivo's phone mirroring, which also sends phone sound to the PC.
 
-How it works: Windows has a built-in Bluetooth audio receiver (`AudioPlaybackConnection`). The patch installs a small PowerShell helper next to vivo's files (`resources\english-patch-bt-audio.ps1`) that vivo Office Kit starts when you click the button. The helper sets the volume of the phone's audio stream through Windows' per-app volume controls.
+How it works: the patch installs a small PowerShell helper next to vivo's files (`resources\english-patch-bt-audio.ps1`) that vivo Office Kit starts when you click the button.
+- **Bluetooth** uses Windows' built-in Bluetooth audio receiver (`AudioPlaybackConnection`).
+- **Wi-Fi** runs scrcpy in audio-only mode (`--no-window --audio-codec=flac`).
+- **Volume:** in both modes, the helper sets the volume of the phone's audio stream through Windows' per-app volume controls.
 
 ## Checking for patch updates from inside the app
 
@@ -95,3 +116,8 @@ Run the installer again and click **Restore Chinese**. This also turns off autom
   3. Put the asset's URL and SHA-256 into `windows/latest.json`, then push.
 - **Experimental, off by default:** `patcher.ps1 install -Bridge` removes vivo's PC-side check that stops Infinite collaboration from running alongside desktop mode. `-NoBridge` turns it off again. It doesn't make typing work in desktop mode, because the phone sends Infinite collaboration keystrokes to its own screen.
 - **Mac and Windows never take each other's updates.** Mac helpers read the root `latest.json` and only accept downloads from `…/vivo-office-kit-english-mac/releases/download/`. Windows helpers read `windows/latest.json` and only accept `…/releases/download/windows-v…`.
+
+## Credits
+
+- **[scrcpy](https://github.com/Genymobile/scrcpy)** by Genymobile (Romain Vimont and contributors) powers Wi-Fi phone audio. It's licensed under the Apache License 2.0. It isn't bundled: it's downloaded from its official release on first use. See [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
+- **Translations** come from the Mac version of this patch.
