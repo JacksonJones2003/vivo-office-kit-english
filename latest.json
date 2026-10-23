@@ -1,7 +1,7 @@
 {
-  "version": "1.8.0",
-  "zip_url": "https://github.com/JacksonJones2003/vivo-office-kit-english-mac/releases/download/v1.8.0/vivo-office-kit-english-mac-v1.8.0.zip",
-  "zip_sha256": "f68d515d877becff094d0c2d15f467e617d195e36306f24c34c2220d6693a7e2",
+  "version": "1.9.0",
+  "zip_url": "https://github.com/JacksonJones2003/vivo-office-kit-english-mac/releases/download/v1.9.0/vivo-office-kit-english-mac-v1.9.0.zip",
+  "zip_sha256": "0454f695eebb3c4d09876eec7e092b0f630a0242c3ead164a33656afe097e3da",
   "full_versions": ["7.0.5", "7.0.6"],
-  "notes": "Full English for vivo Office Kit 7.0.5 and 7.0.6."
+  "notes": "New: Phone audio on Mac over Wi-Fi (lossless, via scrcpy by Genymobile). Full English for vivo Office Kit 7.0.5 and 7.0.6."
 }

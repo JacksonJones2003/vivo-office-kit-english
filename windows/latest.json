@@ -1,7 +1,7 @@
 {
-  "version": "1.10.0",
-  "zip_url": "https://github.com/JacksonJones2003/vivo-office-kit-english/releases/download/windows-v1.10.0/vivo-office-kit-english-windows-v1.10.0.zip",
-  "zip_sha256": "95381cc5da81cb5b0f9af1cee0cc3f7382127db41cc3bf6b4ded5ba8166aaad3",
+  "version": "1.10.1",
+  "zip_url": "https://github.com/JacksonJones2003/vivo-office-kit-english/releases/download/windows-v1.10.1/vivo-office-kit-english-windows-v1.10.1.zip",
+  "zip_sha256": "f6258ce5d8c84b8e9855a0450173253297f13007ca72a7586b7ce6a38438e393",
   "full_versions": ["7.0.5", "7.0.6"],
-  "notes": "Test build. New: lossless Wi-Fi phone audio (via scrcpy by Genymobile) alongside Bluetooth. Full English for vivo Office Kit 7.0.5 and 7.0.6 for Windows."
+  "notes": "Test build. Wi-Fi phone audio reconnects stale links. Lossless Wi-Fi audio (via scrcpy by Genymobile) and Bluetooth audio. Full English for vivo Office Kit 7.0.5 and 7.0.6 for Windows."
 }
