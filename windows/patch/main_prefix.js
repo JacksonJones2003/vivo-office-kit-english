@@ -114,7 +114,7 @@ var PAGE=function(info){
           row.appendChild(b)}
         var on=a.state==="on",busy=a.state==="searching"||a.state==="connecting"||a.state==="downloading";
         var pct=typeof a.volume==="number"&&a.volume>=0?Math.round(a.volume*100):null;
-        var via=a.via==="wifi"?" over Wi-Fi":" over Bluetooth";b.title=a.state==="searching"?"Phone audio: looking for your phone…":a.state==="downloading"?"Phone audio: setting up Wi-Fi audio (one-time download)…":a.state==="connecting"?"Phone audio: connecting to "+a.name+via+"…":on?"Phone audio is on: "+a.name+" plays through this PC"+via+(pct!==null?" at "+pct+"%":"")+". Click for volume and settings.":a.state==="error"?"Phone audio: "+a.error+" Click to try again.":"Phone audio: play your phone's sound through this PC"+via+", without mirroring the screen";
+        var via=a.via==="wifi"?" over Wi-Fi":" over Bluetooth";b.title=a.state==="searching"?"Phone audio: looking for your phone…":a.state==="downloading"?"Phone audio: setting up Wi-Fi audio (one-time download)…":a.state==="connecting"?"Phone audio: connecting to "+a.name+via+"…":on?"Phone audio is on: "+a.name+" plays through this "+(a.platform==="darwin"?"Mac":"PC")+via+(pct!==null?" at "+pct+"%":"")+". Click for volume and settings.":a.state==="error"?"Phone audio: "+a.error+" Click to try again.":"Phone audio: play your phone's sound through this "+(a.platform==="darwin"?"Mac":"PC")+via+", without mirroring the screen";
         if(b.getAttribute("data-k")===key)continue;b.setAttribute("data-k",key);
         var col=on?"#1a8f3c":a.state==="error"?"#c0392b":"";var spk=b.querySelector(".vok-spk"),spin=b.querySelector(".vok-spin");
         spk.style.color=col;spk.style.display=busy?"none":"block";if(spin)spin.style.display=busy?"block":"none";b.style.opacity="";
@@ -145,7 +145,7 @@ var PAGE=function(info){
     var openPanel=function(btn){closePanel();var a=window.__vokAudioState||{},send=function(c){console.log("__VOK_AUDIO__"+c)};
       var p=floating(btn,"vok-audio-panel");p.style.padding="12px 14px";
       var h=document.createElement("div");h.textContent=(a.name||"Phone")+" audio";h.style.cssText="font-weight:600;margin-bottom:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis";p.appendChild(h);
-      var row=document.createElement("div");row.style.cssText="display:flex;align-items:center;gap:8px";
+      var mac=a.platform==="darwin";var row=document.createElement("div");row.style.cssText=mac?"display:none":"display:flex;align-items:center;gap:8px";
       var lo=document.createElementNS("http://www.w3.org/2000/svg","svg");lo.setAttribute("viewBox","0 0 24 24");lo.setAttribute("fill","none");lo.setAttribute("stroke","currentColor");lo.setAttribute("stroke-width","1.8");lo.setAttribute("stroke-linejoin","round");lo.style.cssText="width:14px;height:14px;flex:none;opacity:.7";
       var lp=document.createElementNS("http://www.w3.org/2000/svg","path");lp.setAttribute("d","M4 9.5h3.5L12 5.5v13l-4.5-4H4z");lo.appendChild(lp);row.appendChild(lo);
       var s=document.createElement("input");s.type="range";s.min="0";s.max="100";s.step="1";s.style.cssText="flex:1;min-width:0;accent-color:#3a7afe;cursor:pointer";
@@ -155,13 +155,13 @@ var PAGE=function(info){
       s.oninput=function(){lab.textContent=s.value+"%";pendingV=+s.value;if(Date.now()-last>60)flush();else setTimeout(flush,70)};
       s.onpointerdown=function(){s.__drag=true};s.onpointerup=s.onchange=function(){s.__drag=false;flush()};
       row.appendChild(s);row.appendChild(lab);p.appendChild(row);
-      var note=document.createElement("div");note.textContent="Controls only your phone's sound on this PC.";note.style.cssText="margin-top:6px;font-size:11px;opacity:.55";p.appendChild(note);
+      var note=document.createElement("div");note.textContent=mac?"Playing over Wi-Fi. Use your Mac's volume to change loudness.":"Controls only your phone's sound on this PC.";note.style.cssText="margin-top:6px;font-size:11px;opacity:.55";p.appendChild(note);
       /* Sound via: Bluetooth or Wi-Fi (lossless). Changing it reconnects. */
-      var lab2=document.createElement("div");lab2.textContent="Sound via";lab2.style.cssText="margin-top:12px;margin-bottom:6px;font-size:11px;opacity:.7";p.appendChild(lab2);
+      var lab2=document.createElement("div");lab2.textContent="Sound via";if(mac)lab2.style.display="none";lab2.style.cssText="margin-top:12px;margin-bottom:6px;font-size:11px;opacity:.7";p.appendChild(lab2);
       var seg=document.createElement("div");seg.style.cssText="display:flex;border:1px solid rgba(127,127,127,.3);border-radius:7px;overflow:hidden";
       [["bt","Bluetooth"],["wifi","Wi-Fi (lossless)"]].forEach(function(o){var d=document.createElement("div");d.textContent=o[1];var sel=(a.via||"bt")===o[0];
         d.style.cssText="flex:1;text-align:center;padding:4px 6px;cursor:"+(sel?"default":"pointer")+";font-size:11.5px;"+(sel?"background:#3a7afe;color:#fff":"");
-        d.onclick=function(){if(!sel){closePanel();send("via:"+o[0])}};seg.appendChild(d)});p.appendChild(seg);
+        d.onclick=function(){if(!sel){closePanel();send("via:"+o[0])}};seg.appendChild(d)});if(!mac)p.appendChild(seg);
       if(a.via==="wifi"){var dl=document.createElement("label");dl.style.cssText="display:flex;align-items:center;gap:6px;margin-top:8px;font-size:11.5px;cursor:pointer";
         var cb=document.createElement("input");cb.type="checkbox";cb.checked=!!a.dup;cb.onchange=function(){closePanel();send("dup:"+(cb.checked?1:0))};
         dl.appendChild(cb);dl.appendChild(document.createTextNode("Also play on the phone"));p.appendChild(dl);

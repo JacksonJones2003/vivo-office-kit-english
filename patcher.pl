@@ -22,7 +22,7 @@ use JSON::PP;
 use File::Basename qw(dirname);
 use Cwd qw(abs_path);
 
-my $PATCH_VERSION = '1.8.0';
+my $PATCH_VERSION = '1.9.0';
 my $BLOCK  = 4 * 1024 * 1024;
 my $MARK   = ";(function(){try{\n/* English patch";   # start of patch/main_prefix.js
 my $DIST   = 'dist/electron';
@@ -218,6 +218,7 @@ if ($cmd eq 'restore') {
     fail(1, "The backup of the original archive is missing. Reinstall vivo Office Kit from vivo's installer to restore it.") unless $bak;
     rename($backup, $asar) or fail(perm(), "Could not restore: $!");
     remove_lproj();
+    unlink "$res/english-patch-wifi-audio.sh";   # helper for Phone audio
     unlink $marker;
     print "Restored the original Chinese version.\n"; exit 0;
 }
@@ -278,6 +279,11 @@ my @st = stat($source->{path});
 chmod($st[2] & 07777, $tmp); chown($st[4], $st[5], $tmp);
 if (!$cur_patched) { rename($asar, $backup) or do { unlink $tmp; fail(perm(), "Could not back up the original: $!"); }; }
 rename($tmp, $asar) or do { rename($backup, $asar) unless $cur_patched; unlink $tmp; fail(perm(), "Could not install the patched archive: $!"); };
+# Helper for "Phone audio" (Wi-Fi, scrcpy); the patched app runs it with /bin/bash.
+if (-f "$pdir/wifi-audio.sh") {
+    my $h = slurp("$pdir/wifi-audio.sh");
+    if (open(my $ho, '>:raw', "$res/english-patch-wifi-audio.sh")) { print $ho $h; close $ho; chmod(0755, "$res/english-patch-wifi-audio.sh"); chown($st[4], $st[5], "$res/english-patch-wifi-audio.sh"); }
+}
 my $lp = add_lproj();
 $lp = 'created' if $lp eq 'present' && marker_says('lproj') eq 'created';
 if (open(my $mf, '>', $marker)) { print $mf "patch=$PATCH_VERSION\nmode=$p->{mode}\ndetail=$p->{detail}\nlproj=$lp\n"; close $mf; chown($st[4], $st[5], $marker); }

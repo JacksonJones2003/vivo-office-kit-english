@@ -128,6 +128,11 @@ public static class Vol {
         $serial = "${ip}:5555"
         $out = Run $adb @('connect', $serial) 15000
         $dev = Run $adb @('devices') 8000
+        if ($dev -match [regex]::Escape($serial) + '\s+offline') {
+            # A stale link (the phone dropped it): reconnect.
+            [void](Run $adb @('disconnect', $serial) 8000); Start-Sleep -Seconds 1
+            $out = Run $adb @('connect', $serial) 15000; $dev = Run $adb @('devices') 8000
+        }
         if ($dev -notmatch [regex]::Escape($serial) + '\s+device') {
             # Not listening on Wi-Fi (for example after the phone restarted). If it is plugged in by USB, switch its
             # debugging to Wi-Fi (port 5555) and try again.

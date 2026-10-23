@@ -68,6 +68,29 @@ when the installer asks, it sets up a small background helper:
 To turn it off, run the installer and choose **Restore Chinese**, or run
 `watcher/setup-watcher.sh remove` from this folder. Both remove the helper and its launch monitor.
 
+## Phone audio on Mac (Wi-Fi, no mirroring)
+
+> [!NOTE]
+> New in 1.9.0 and **not yet tested on a real Mac**. The same feature has been tested on Windows. Please report how it works.
+
+The patch adds a small **speaker button** to your phone's card in vivo Office Kit, next to **Transfer history** and **Handoff connectivity**. It plays your phone's sound through your Mac over Wi-Fi, as lossless FLAC, without mirroring the screen. It uses [scrcpy](https://github.com/Genymobile/scrcpy) by Genymobile (see Credits).
+
+How to use it:
+- **Turn it on:** click the speaker button. A spinner shows while it connects, then the button turns green.
+- **Settings:** click the green button again to open a panel. It has **Also play on the phone** and **Turn off phone audio**. Use your Mac's own volume to change loudness, because macOS has no per-app volume control.
+- **Turn it off:** choose **Turn off phone audio**, or quit vivo Office Kit.
+
+Notes:
+- **Bluetooth isn't available on Mac.** macOS can't receive a phone's sound over Bluetooth, so the Mac version always uses Wi-Fi.
+- **One-time download:** the first time you use it, the patch downloads the official scrcpy release for your Mac (Apple silicon or Intel, about 13 MB) from scrcpy's GitHub page. It checks the download against its published checksum before using it, and keeps it in `~/Library/Application Support/vivo-office-kit-english-watcher/scrcpy`.
+- **Debugging access:** your phone must allow debugging from this Mac over the network.
+  - If the phone is plugged in by USB, the patch sets this up automatically.
+  - If the phone asks to **Allow debugging** from this computer, tap **Allow**, then **Always allow**.
+  - If it says the phone isn't accepting connections, plug the phone into the Mac with a USB cable once and try again.
+- **Requirements:** the phone and Mac must be on the same network, and the phone needs Android 11 or newer.
+- **Apps can opt out:** some apps block their audio from being captured, and their sound won't come through.
+- **Separate from vivo:** Wi-Fi audio runs its own copy of Android's `adb` on its own port, so it doesn't interfere with vivo Office Kit.
+
 ## Checking for patch updates from inside the app
 
 The main window of the patched app has a small **English patch vX · Check for updates** button in the bottom-right
@@ -181,3 +204,7 @@ after. In both modes the rebuilt archive is read back and verified before it rep
 ## License
 
 MIT for the scripts and translations in this repository. vivo Office Kit itself belongs to vivo.
+
+## Credits
+
+- **[scrcpy](https://github.com/Genymobile/scrcpy)** by Genymobile (Romain Vimont and contributors) powers Wi-Fi phone audio on Mac and Windows. It's licensed under the Apache License 2.0. It isn't bundled: it's downloaded from its official release on first use. See [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
