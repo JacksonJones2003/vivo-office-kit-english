@@ -160,6 +160,7 @@ vivo's programs, background services or system extensions, and it needs nothing 
   If the app already has an English folder, it is left alone.
 - Makes the vivo account sign-in window English by asking vivo's sign-in page for English, and shows a
   built-in English slide next to it instead of the Chinese slideshow sent by vivo's servers.
+- Makes the incoming-call window English (on Mac), the same way as mirroring but with a window of about 4 seconds.
 - Makes the phone mirroring and PC mode windows English. Those helper programs only load English when a
   shared setting (`isExport`) is on as they start, so the app turns it on for about 12 seconds each time it
   opens one of them and then turns it off again.

@@ -11,8 +11,10 @@ var off=function(){upd(function(d){if(d.isExport===true)d.isExport=false})};
 var timer=null,spawn=cp.spawn;
 var english=function(){upd(function(d){if(d.isExport===true&&!timer)d.isExport=false;d.currentLanguage="en_US";d.isRtl=false})};
 english();[2000,8000,20000,60000].forEach(function(ms){setTimeout(english,ms)});
-var helperStarting=function(){upd(function(d){d.isExport=true;d.currentLanguage="en_US";d.isRtl=false});clearTimeout(timer);timer=setTimeout(function(){timer=null;off()},12000)};
-cp.spawn=function(cmd){try{if(typeof cmd==="string"&&/\/(vivoScreen|vScreen|PCMode)$/.test(cmd))helperStarting()}catch(e){}return spawn.apply(this,arguments)};
+var offAt=0;
+var helperStarting=function(ms){ms=ms||12000;upd(function(d){d.isExport=true;d.currentLanguage="en_US";d.isRtl=false});var at=Date.now()+ms;if(at<offAt)return;offAt=at;clearTimeout(timer);timer=setTimeout(function(){timer=null;offAt=0;off()},ms)};
+/* The call window's helper reads the setting within a second of starting, and starts as the phone connects, so it gets a much shorter window. */
+cp.spawn=function(cmd){try{if(typeof cmd==="string"){if(/\/(vivoScreen|vScreen|PCMode)$/.test(cmd))helperStarting();else if(/\/phonecall$/.test(cmd))helperStarting(4000)}}catch(e){}return spawn.apply(this,arguments)};
 /* Switching between phone mirroring and desktop mode from inside those windows starts the other helper directly,
    not through this app. The app is told with a "switch_app_action" message, which it logs before acting on it,
    a moment before the new helper reads its language: switch English on at that point too. */
