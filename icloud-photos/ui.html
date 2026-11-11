@@ -1,0 +1,363 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>iCloud Photos</title>
+<style>
+:root{
+  --bg:#f5f5f7; --panel:#fff; --text:#1d1d1f; --muted:#6e6e73; --line:rgba(0,0,0,.10);
+  --accent:#2f6fe4; --accent-2:#1f5dd0; --danger:#c0392b; --ok:#1a8f3c; --shadow:0 10px 40px rgba(0,0,0,.12);
+}
+@media (prefers-color-scheme:dark){
+  :root{--bg:#161617; --panel:#232326; --text:#f5f5f7; --muted:#a1a1a6; --line:rgba(255,255,255,.12); --shadow:0 10px 40px rgba(0,0,0,.45);}
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--text);font:13px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;overflow:hidden}
+button{font:inherit;color:inherit;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:6px 12px;cursor:pointer}
+button:hover{filter:brightness(.97)}
+button.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+button.primary:hover{background:var(--accent-2)}
+button.danger{color:var(--danger);border-color:rgba(192,57,43,.35)}
+button:disabled{opacity:.5;cursor:default}
+input,select{font:inherit;color:inherit;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:8px 10px;width:100%;outline:none}
+input:focus,select:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(47,111,228,.15)}
+#app{display:flex;flex-direction:column;height:100%}
+header{display:flex;align-items:center;gap:12px;padding:10px 16px;border-bottom:1px solid var(--line);background:var(--panel);flex:none}
+.brand{display:flex;align-items:center;gap:8px;font-weight:600;font-size:14px;white-space:nowrap}
+.brand svg{width:20px;height:20px;color:var(--accent)}
+#acct{font-weight:400;color:var(--muted);font-size:12px;margin-left:4px;max-width:40vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.actions{margin-left:auto;display:flex;gap:6px;align-items:center}
+main{flex:1;min-height:0;overflow:auto;padding:18px}
+.card{max-width:440px;margin:8vh auto 0;background:var(--panel);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);padding:22px}
+.card h2{margin:0 0 4px;font-size:18px}
+.card p.sub{margin:0 0 18px;color:var(--muted);font-size:12.5px}
+.field{margin:12px 0}
+.field label{display:block;font-size:12px;color:var(--muted);margin-bottom:5px}
+.row{display:flex;gap:8px;align-items:center}
+.row > *{flex:1}
+.hint{font-size:11.5px;color:var(--muted);margin-top:8px;line-height:1.5}
+.error{color:var(--danger);background:rgba(192,57,43,.08);border:1px solid rgba(192,57,43,.25);border-radius:8px;padding:8px 10px;margin-top:12px;font-size:12px;white-space:pre-wrap}
+.hidden{display:none!important}
+#photos{max-width:1500px;margin:0 auto}
+.toolbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:0 0 12px}
+.toolbar .count{color:var(--muted);margin-right:auto}
+.progress{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin:0 0 12px;display:flex;align-items:center;gap:12px}
+.bar{flex:1;height:6px;background:var(--line);border-radius:4px;overflow:hidden}
+.bar > i{display:block;height:100%;width:0;background:var(--accent);transition:width .25s}
+#grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(135px,1fr));gap:10px}
+.photo{position:relative;aspect-ratio:4/3;border-radius:10px;overflow:hidden;background:var(--line);cursor:pointer;border:2px solid transparent}
+.photo.sel{border-color:var(--accent)}
+.photo img{width:100%;height:100%;object-fit:cover;display:block;background:var(--line)}
+.photo .cb{position:absolute;top:6px;left:6px;width:18px;height:18px;border-radius:50%;border:1.5px solid #fff;background:rgba(0,0,0,.35);display:flex;align-items:center;justify-content:center;color:#fff;font-size:11px}
+.photo.sel .cb{background:var(--accent);border-color:var(--accent)}
+.photo .meta{position:absolute;left:0;right:0;bottom:0;padding:14px 7px 5px;background:linear-gradient(transparent,rgba(0,0,0,.65));color:#fff;font-size:10.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.photo .badge{position:absolute;top:6px;right:6px;background:rgba(0,0,0,.55);color:#fff;border-radius:5px;font-size:10px;padding:1px 5px}
+#empty{text-align:center;color:var(--muted);padding:15vh 20px}
+#more{text-align:center;padding:18px}
+#toast{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);background:rgba(30,30,32,.94);color:#fff;border-radius:9px;padding:8px 14px;font-size:12.5px;opacity:0;pointer-events:none;transition:opacity .2s;max-width:80vw;z-index:5}
+#toast.show{opacity:1}
+.spinner{width:16px;height:16px;border:2px solid var(--line);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite;display:inline-block;vertical-align:-3px}
+@keyframes spin{to{transform:rotate(360deg)}}
+.foot{color:var(--muted);font-size:11px;margin-top:14px;line-height:1.5}
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <div class="brand">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 18h10a3.5 3.5 0 0 0 .5-7 5.5 5.5 0 0 0-10.6-1.4A4 4 0 0 0 7 18Z"/><path d="m9 14 2 2 4-4"/></svg>
+      iCloud Photos <span id="acct"></span>
+    </div>
+    <div class="actions">
+      <button id="btnDownloads" title="Open ~/Pictures/iCloud Photos">Downloads Folder</button>
+      <button id="btnRefresh" title="Refresh">Refresh</button>
+      <button id="btnLogout" class="danger hidden">Sign out</button>
+      <button id="btnClose">Close</button>
+    </div>
+  </header>
+  <main>
+    <section id="login" class="card">
+      <h2>Sign in to iCloud Photos</h2>
+      <p class="sub">Your Apple ID and password go only to Apple. Use the six-digit code from your trusted devices when asked.</p>
+      <div class="field"><label for="appleId">Apple ID</label><input id="appleId" type="email" autocomplete="username" placeholder="name@example.com"></div>
+      <div class="field"><label for="password">Password</label><input id="password" type="password" autocomplete="current-password" placeholder="Apple ID password"></div>
+      <div class="row"><button id="btnLogin" class="primary" style="flex:0 0 auto">Sign in</button><span id="loginSpin" class="hidden"><span class="spinner"></span> Signing in…</span></div>
+      <div id="loginError" class="error hidden"></div>
+      <div class="hint">Apple may ask for a two-factor code. Your password is not stored; iCloud session cookies are kept in Application Support on this Mac.</div>
+    </section>
+
+    <section id="twofa" class="card hidden">
+      <h2>Two-factor authentication</h2>
+      <p class="sub" id="twofaMsg">Enter the six-digit code shown on your Apple devices.</p>
+      <div class="field"><label for="twofaCode">Code</label><input id="twofaCode" inputmode="numeric" maxlength="6" placeholder="123456"></div>
+      <div class="row"><button id="btnTwofa" class="primary" style="flex:0 0 auto">Verify</button><button id="btnTwofaBack" style="flex:0 0 auto">Sign in again</button></div>
+      <div id="twofaError" class="error hidden"></div>
+    </section>
+
+    <section id="twosa" class="card hidden">
+      <h2>Two-step authentication</h2>
+      <p class="sub">Choose a trusted device, then enter the code it receives.</p>
+      <div class="field"><label for="twofaDevice">Trusted device</label><select id="twofaDevice"></select></div>
+      <div class="row"><button id="btnSend2sa" class="primary" style="flex:0 0 auto">Send code</button></div>
+      <div class="field"><label for="twosaCode">Code</label><input id="twosaCode" inputmode="numeric" maxlength="6" placeholder="123456"></div>
+      <div class="row"><button id="btnTwosa" class="primary" style="flex:0 0 auto">Verify</button><button id="btnTwosaBack" style="flex:0 0 auto">Sign in again</button></div>
+      <div id="twosaError" class="error hidden"></div>
+    </section>
+
+    <section id="photos" class="hidden">
+      <div class="toolbar">
+        <span class="count" id="count"></span>
+        <button id="btnSelectAll">Select all</button>
+        <button id="btnSelectNone">Clear</button>
+        <button id="btnDownload" class="primary" disabled>Download selected</button>
+      </div>
+      <div id="progress" class="progress hidden"><span id="progressText">Downloading…</span><span class="bar"><i id="progressBar"></i></span><span id="progressPct"></span></div>
+      <div id="grid"></div>
+      <div id="empty" class="hidden">No photos appear in your iCloud library yet.</div>
+      <div id="more" class="hidden"><button id="btnMore">Load more</button></div>
+    </section>
+  </main>
+</div>
+<div id="toast"></div>
+<script>
+"use strict";
+const TOKEN = new URLSearchParams(location.search).get("token") || "";
+const $ = (id) => document.getElementById(id);
+let view = "login";
+let photos = [];
+let selected = new Set();
+let offset = 0;
+let hasMore = false;
+let loading = false;
+let pollTimer = null;
+
+function qs(path) {
+  return path + (path.includes("?") ? "&" : "?") + "token=" + encodeURIComponent(TOKEN);
+}
+async function api(path, opts = {}) {
+  const res = await fetch(qs(path), Object.assign({ headers: { "Content-Type": "application/json" } }, opts));
+  let data = {};
+  try { data = await res.json(); } catch (e) {}
+  if (!res.ok && data && !data.message) data.message = "Request failed (" + res.status + ")";
+  return data;
+}
+function show(name) {
+  view = name;
+  for (const id of ["login", "twofa", "twosa", "photos"]) $(id).classList.toggle("hidden", id !== name);
+  $("btnLogout").classList.toggle("hidden", name === "login");
+}
+function toast(msg) {
+  const t = $("toast");
+  t.textContent = msg;
+  t.classList.add("show");
+  clearTimeout(t._t);
+  t._t = setTimeout(() => t.classList.remove("show"), 3200);
+}
+function err(id, msg) {
+  const e = $(id);
+  if (!msg) { e.classList.add("hidden"); e.textContent = ""; return; }
+  e.textContent = msg;
+  e.classList.remove("hidden");
+}
+function closePanel() {
+  try { window.parent.postMessage({ type: "vok-icloud-close" }, "*"); } catch (e) {}
+  try { window.close(); } catch (e) {}
+}
+function fmtDate(s) {
+  if (!s) return "";
+  const d = new Date(s);
+  if (isNaN(d)) return "";
+  return d.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
+}
+function setBusy(on) {
+  $("btnLogin").disabled = on;
+  $("loginSpin").classList.toggle("hidden", !on);
+}
+async function loadStatus() {
+  const s = await api("/api/status");
+  if (!s || !s.ok) { err("loginError", (s && s.message) || "The iCloud service is not responding."); return; }
+  $("acct").textContent = s.account ? "· " + s.account : "";
+  if (s.import_error) { err("loginError", s.import_error); }
+  if (s.state === "starting") { show("login"); setTimeout(loadStatus, 800); return; }
+  if (s.state === "ready") {
+    show("photos");
+    $("btnLogout").classList.remove("hidden");
+    if (!photos.length) loadPhotos(true);
+  } else if (s.state === "needs_2fa") {
+    show("twofa");
+  } else if (s.state === "needs_2sa") {
+    show("twosa");
+  } else {
+    show("login");
+  }
+}
+async function doLogin() {
+  err("loginError", "");
+  const apple_id = $("appleId").value.trim();
+  const password = $("password").value;
+  if (!apple_id || !password) { err("loginError", "Enter your Apple ID and password."); return; }
+  setBusy(true);
+  const r = await api("/api/login", { method: "POST", body: JSON.stringify({ apple_id, password }) });
+  setBusy(false);
+  $("password").value = "";
+  if (r.ok) {
+    $("acct").textContent = "· " + apple_id;
+    photos = []; offset = 0; selected.clear();
+    show("photos"); $("btnLogout").classList.remove("hidden");
+    loadPhotos(true);
+  } else if (r.needs_2fa) {
+    $("twofaMsg").textContent = r.message || "Enter the six-digit code shown on your Apple devices.";
+    show("twofa"); $("twofaCode").focus();
+  } else if (r.needs_2sa) {
+    const sel = $("twofaDevice");
+    sel.innerHTML = "";
+    (r.devices || []).forEach((d) => {
+      const o = document.createElement("option");
+      o.value = String(d.index);
+      o.textContent = (d.name || "Apple device") + (d.phone ? " · " + d.phone : "");
+      sel.appendChild(o);
+    });
+    show("twosa");
+  } else {
+    err("loginError", r.message || "Sign-in failed.");
+  }
+}
+async function do2fa() {
+  err("twofaError", "");
+  const code = $("twofaCode").value.trim();
+  if (!/^\d{6}$/.test(code)) { err("twofaError", "Enter the six-digit code."); return; }
+  $("btnTwofa").disabled = true;
+  const r = await api("/api/2fa", { method: "POST", body: JSON.stringify({ code }) });
+  $("btnTwofa").disabled = false;
+  if (r.ok) { photos = []; offset = 0; show("photos"); $("btnLogout").classList.remove("hidden"); loadPhotos(true); }
+  else err("twofaError", r.message || "The code was not accepted.");
+}
+async function send2sa() {
+  err("twosaError", "");
+  const index = parseInt($("twofaDevice").value || "0", 10);
+  const r = await api("/api/2sa/send", { method: "POST", body: JSON.stringify({ index }) });
+  if (r.ok) toast("Code sent to the selected device."); else err("twosaError", r.message || "Could not send the code.");
+}
+async function do2sa() {
+  err("twosaError", "");
+  const code = $("twosaCode").value.trim();
+  if (!/^\d{6}$/.test(code)) { err("twosaError", "Enter the six-digit code."); return; }
+  const r = await api("/api/2sa/verify", { method: "POST", body: JSON.stringify({ code }) });
+  if (r.ok) { photos = []; offset = 0; show("photos"); $("btnLogout").classList.remove("hidden"); loadPhotos(true); }
+  else err("twosaError", r.message || "The code was not accepted.");
+}
+function updateCount() {
+  $("count").textContent = photos.length + (hasMore ? "+" : "") + " photos" + (selected.size ? " · " + selected.size + " selected" : "");
+  $("btnDownload").disabled = selected.size === 0;
+  $("btnDownload").textContent = selected.size ? "Download selected (" + selected.size + ")" : "Download selected";
+}
+function makeCard(p) {
+  const card = document.createElement("div");
+  card.className = "photo" + (selected.has(p.id) ? " sel" : "");
+  card.dataset.id = p.id;
+  card.title = p.filename + (p.date ? "\n" + fmtDate(p.date) : "");
+  const img = document.createElement("img");
+  img.loading = "lazy";
+  img.alt = p.filename;
+  img.src = qs("/api/thumb?id=" + encodeURIComponent(p.id));
+  img.onerror = () => { img.style.visibility = "hidden"; };
+  const cb = document.createElement("span");
+  cb.className = "cb";
+  cb.textContent = selected.has(p.id) ? "✓" : "";
+  const meta = document.createElement("div");
+  meta.className = "meta";
+  meta.textContent = fmtDate(p.date) || p.filename;
+  card.appendChild(img); card.appendChild(cb); card.appendChild(meta);
+  if (p.type === "movie") {
+    const b = document.createElement("span");
+    b.className = "badge"; b.textContent = "Video"; card.appendChild(b);
+  } else if (p.live) {
+    const b = document.createElement("span");
+    b.className = "badge"; b.textContent = "Live"; card.appendChild(b);
+  }
+  card.onclick = () => {
+    if (selected.has(p.id)) selected.delete(p.id); else selected.add(p.id);
+    card.classList.toggle("sel", selected.has(p.id));
+    cb.textContent = selected.has(p.id) ? "✓" : "";
+    updateCount();
+  };
+  return card;
+}
+async function loadPhotos(reset) {
+  if (loading) return;
+  loading = true;
+  if (reset) { photos = []; offset = 0; selected.clear(); $("grid").innerHTML = ""; }
+  const r = await api("/api/photos?offset=" + offset + "&limit=60");
+  loading = false;
+  if (!r || !r.ok) { toast((r && r.message) || "Could not load photos."); return; }
+  const grid = $("grid");
+  r.photos.forEach((p) => { photos.push(p); grid.appendChild(makeCard(p)); });
+  offset += r.photos.length;
+  hasMore = !!r.has_more;
+  $("more").classList.toggle("hidden", !hasMore);
+  $("empty").classList.toggle("hidden", photos.length > 0 || hasMore);
+  updateCount();
+}
+async function downloadSelected() {
+  if (!selected.size) return;
+  $("progress").classList.remove("hidden");
+  $("btnDownload").disabled = true;
+  $("progressText").textContent = "Starting download…";
+  $("progressBar").style.width = "0%";
+  $("progressPct").textContent = "";
+  const r = await api("/api/download", { method: "POST", body: JSON.stringify({ ids: Array.from(selected) }) });
+  if (!r.ok) { toast(r.message || "Could not start the download."); $("progress").classList.add("hidden"); updateCount(); return; }
+  const job = r.job;
+  clearInterval(pollTimer);
+  pollTimer = setInterval(async () => {
+    const s = await api("/api/job?id=" + encodeURIComponent(job.id));
+    if (!s.ok) { clearInterval(pollTimer); toast(s.message || "Download lost."); return; }
+    const j = s.job;
+    const pct = j.total ? Math.round(100 * j.done / j.total) : 0;
+    $("progressText").textContent = j.status === "done" ? "Downloaded " + j.files.length + " item(s)" : "Downloading " + j.done + " of " + j.total + "…";
+    $("progressBar").style.width = pct + "%";
+    $("progressPct").textContent = pct + "%";
+    if (j.status === "done") {
+      clearInterval(pollTimer);
+      $("btnDownload").disabled = selected.size === 0;
+      if (j.errors && j.errors.length) toast("Finished with " + j.errors.length + " error(s): " + j.errors[0]);
+      else toast("Saved " + j.files.length + " item(s) to Pictures/iCloud Photos.");
+      selected.clear();
+      document.querySelectorAll(".photo.sel").forEach((e) => e.classList.remove("sel"));
+      document.querySelectorAll(".photo .cb").forEach((e) => { e.textContent = ""; });
+      $("progressBar").style.width = "100%";
+      $("progressText").textContent = "Done — Pictures/iCloud Photos";
+      $("progressPct").textContent = "";
+      updateCount();
+      setTimeout(() => $("progress").classList.add("hidden"), 4000);
+    }
+  }, 700);
+}
+$("btnLogin").onclick = doLogin;
+$("password").addEventListener("keydown", (e) => { if (e.key === "Enter") doLogin(); });
+$("btnTwofa").onclick = do2fa;
+$("twofaCode").addEventListener("keydown", (e) => { if (e.key === "Enter") do2fa(); });
+$("btnTwofaBack").onclick = () => { show("login"); };
+$("btnSend2sa").onclick = send2sa;
+$("btnTwosa").onclick = do2sa;
+$("twosaCode").addEventListener("keydown", (e) => { if (e.key === "Enter") do2sa(); });
+$("btnTwosaBack").onclick = () => { show("login"); };
+$("btnSelectAll").onclick = () => { photos.forEach((p) => selected.add(p.id)); document.querySelectorAll("#grid .photo").forEach((e) => { e.classList.add("sel"); e.querySelector(".cb").textContent = "✓"; }); updateCount(); };
+$("btnSelectNone").onclick = () => { selected.clear(); document.querySelectorAll("#grid .photo").forEach((e) => { e.classList.remove("sel"); e.querySelector(".cb").textContent = ""; }); updateCount(); };
+$("btnDownload").onclick = downloadSelected;
+$("btnMore").onclick = () => loadPhotos(false);
+$("btnRefresh").onclick = () => { photos = []; offset = 0; selected.clear(); $("grid").innerHTML = ""; loadStatus(); loadPhotos(true); };
+$("btnDownloads").onclick = () => api("/api/open-downloads", { method: "POST", body: "{}" });
+$("btnLogout").onclick = async () => {
+  await api("/api/logout", { method: "POST", body: "{}" });
+  photos = []; offset = 0; selected.clear(); $("grid").innerHTML = ""; $("acct").textContent = "";
+  $("btnLogout").classList.add("hidden"); show("login");
+};
+$("btnClose").onclick = closePanel;
+document.addEventListener("keydown", (e) => { if (e.key === "Escape") closePanel(); });
+loadStatus();
+</script>
+</body>
+</html>

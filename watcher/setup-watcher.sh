@@ -34,10 +34,9 @@ remove)
   echo "Automatic re-patching is off." ;;
 install)
   mkdir -p "$W/kit" "$HOME/Library/LaunchAgents" "$HOME/Library/Logs"
-  # Build the optional native iCloud Photos window if it is missing (needs Xcode Command Line Tools).
-  HELPER="$HOME/Library/Application Support/vivo-office-kit-icloud-photos/iCloud Photos.app"
-  if [ ! -d "$HELPER" ] && [ -x "$SRC/icloud-photos/build.sh" ]; then
-    "$SRC/icloud-photos/build.sh" >/dev/null 2>&1 || true
+  # Install the in-app iCloud Photos service if it is missing (Python 3 + pyicloud).
+  if [ ! -x "$HOME/Library/Application Support/vivo-office-kit-icloud-photos/venv/bin/python" ] && [ -x "$SRC/icloud-photos/setup.sh" ]; then
+    "$SRC/icloud-photos/setup.sh" >/dev/null 2>&1 || true
   fi
   # Fresh copy of the patch itself (kept separate from the helper app so updating it does not reset macOS permissions).
   rm -rf "$W/kit.new"; mkdir -p "$W/kit.new"

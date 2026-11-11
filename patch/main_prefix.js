@@ -30,16 +30,39 @@ var RELEASES_URL="https://github.com/JacksonJones2003/vivo-office-kit-english-ma
 var WATCHER=path.join(os.homedir(),"Library/LaunchAgents/io.github.jacksonjones2003.vivo-english-watcher.plist");
 var WDIR=path.join(os.homedir(),"Library/Application Support/vivo-office-kit-english-watcher");
 var REPO_URL="https://github.com/JacksonJones2003/vivo-office-kit-english-mac";
-/* iCloud Photos: Apple does not expose the iCloud Photo Library to apps. A small native window built by
-   the installer (WebKit/iCloud.com) is launched from the app's menu and from a button in the main window.
-   Downloads are saved to ~/Pictures/iCloud Photos, ready to drag into Albums or copy to the phone. */
-var ICLOUD_APP=path.join(os.homedir(),"Library/Application Support/vivo-office-kit-icloud-photos/iCloud Photos.app");
+/* iCloud Photos: a local pyicloud service (installed by the installer) talks to Apple; the photo panel is
+   rendered inside the app's own window as an overlay, not in a separate window. Downloads go to
+   ~/Pictures/iCloud Photos. */
+var ICLOUD_DIR=path.join(os.homedir(),"Library/Application Support/vivo-office-kit-icloud-photos");
+var ICLOUD_PY=path.join(ICLOUD_DIR,"venv/bin/python");
+var ICLOUD_SVC=path.join(ICLOUD_DIR,"service.py");
+var ICLOUD_STATE=path.join(ICLOUD_DIR,"server.json");
+var ICLOUD_LOG=path.join(ICLOUD_DIR,"service.log");
 var ICLOUD_DL=path.join(os.homedir(),"Pictures","iCloud Photos");
-var openICloud=function(){try{if(fs.existsSync(ICLOUD_APP)){var c=spawn.call(cp,"/usr/bin/open",[ICLOUD_APP],{stdio:"ignore",detached:true});c.on("error",function(){});c.unref();return}
-  el.shell.openExternal("https://www.icloud.com/photos/")}catch(e){}};
+var icloudProc=null,icloudUrl="",icloudStarting=false,icloudWaiters=[];
+var showIcloud=function(wc,url){try{wc.executeJavaScript("window.__vokShowIcloud("+JSON.stringify(url)+")",true).catch(function(){})}catch(e){}};
+var icloudReady=function(){try{var s=JSON.parse(fs.readFileSync(ICLOUD_STATE,"utf8"));if(!s||!s.port||!s.token)return "";
+  if(s.pid){try{process.kill(s.pid,0)}catch(e){return ""}}
+  return "http://127.0.0.1:"+s.port+"/?token="+encodeURIComponent(s.token)}catch(e){return ""}};
+var startIcloud=function(cb){var existing=icloudReady();if(existing){icloudUrl=existing;if(cb)cb(existing);return}
+  if(cb)icloudWaiters.push(cb);if(icloudStarting)return;
+  if(!fs.existsSync(ICLOUD_PY)||!fs.existsSync(ICLOUD_SVC)){var w=icloudWaiters.splice(0);w.forEach(function(f){f(null)});return}
+  icloudStarting=true;var out=null;try{out=fs.openSync(ICLOUD_LOG,"a")}catch(e){}
+  try{icloudProc=spawn.call(cp,ICLOUD_PY,[ICLOUD_SVC],{cwd:ICLOUD_DIR,env:Object.assign({},process.env,{VOK_ICLOUD_DIR:ICLOUD_DIR}),stdio:["ignore",out===null?"ignore":out,out===null?"ignore":out]});
+    icloudProc.on("exit",function(){icloudProc=null;icloudUrl="";icloudStarting=false});
+    icloudProc.on("error",function(){icloudProc=null;icloudUrl="";icloudStarting=false;var we=icloudWaiters.splice(0);we.forEach(function(f){f(null)})})}
+  catch(e){icloudStarting=false;var ww=icloudWaiters.splice(0);ww.forEach(function(f){f(null)});return}
+  if(out!==null)try{fs.closeSync(out)}catch(e){}
+  var tries=0,poll=function(){var url=icloudReady();
+    if(url){icloudUrl=url;icloudStarting=false;var w2=icloudWaiters.splice(0);w2.forEach(function(f){f(url)});return}
+    if(++tries>200){icloudStarting=false;var w3=icloudWaiters.splice(0);w3.forEach(function(f){f(null)});return}
+    setTimeout(poll,100)};poll();};
+var openICloud=function(wc){var target=wc||((el.BrowserWindow.getFocusedWindow()||el.BrowserWindow.getAllWindows()[0]||{}).webContents);if(!target)return;
+  startIcloud(function(url){if(url)showIcloud(target,url);else el.dialog.showMessageBox({type:"info",message:"iCloud Photos is not set up",detail:"Run the English patch installer again to install the iCloud Photos service.",buttons:["OK"]}).catch(function(){})})};
 var openICloudFolder=function(){try{fs.mkdirSync(ICLOUD_DL,{recursive:true})}catch(e){}try{el.shell.openPath(ICLOUD_DL)}catch(e){}};
+el.app.on("before-quit",function(){try{var s=JSON.parse(fs.readFileSync(ICLOUD_STATE,"utf8"));if(s&&s.pid)process.kill(s.pid)}catch(e){}try{if(icloudProc)icloudProc.kill()}catch(e){}});
 var addICloudMenu=function(){try{var m=el.Menu.getApplicationMenu();if(!m||m.__vokIcloud)return;
-  var sub=new el.Menu();sub.append(new el.MenuItem({label:"Open iCloud Photos…",click:openICloud}));sub.append(new el.MenuItem({label:"Open Downloads Folder",click:openICloudFolder}));
+  var sub=new el.Menu();sub.append(new el.MenuItem({label:"Open iCloud Photos…",click:function(){openICloud()}}));sub.append(new el.MenuItem({label:"Open Downloads Folder",click:openICloudFolder}));
   var item=new el.MenuItem({label:"iCloud Photos",submenu:sub});m.append(item);m.__vokIcloud=true}catch(e){}};
 var MARK=(function(){try{return fs.readFileSync(path.join(process.resourcesPath,"app.asar.english-patch"),"utf8")}catch(e){return ""}})();
 var mk=function(k){var m=MARK.match(new RegExp("^"+k+"=(.*)$","m"));return m?m[1].trim():""};
@@ -80,6 +103,17 @@ var PAGE=function(info){
       if(!p){p=document.createElement("div");p.id="vok-icloud-pill";
         p.style.cssText="position:fixed;right:14px;bottom:44px;z-index:2147483000;display:flex;align-items:center;gap:5px;font:11px/1.3 -apple-system,BlinkMacSystemFont,sans-serif;color:#2f6fe4;background:rgba(47,111,228,.12);border:1px solid rgba(47,111,228,.28);border-radius:11px;padding:4px 10px;cursor:pointer;-webkit-user-select:none;user-select:none;backdrop-filter:blur(6px)";
         p.textContent="iCloud Photos";p.title="Open iCloud Photos — sign in with your Apple ID, download photos to Pictures/iCloud Photos";p.onclick=function(){console.log("__VOK_OPEN_ICLOUD__")};document.body.appendChild(p)}};
+    /* The in-app iCloud Photos panel: an overlay inside this same window. The panel is served by the
+       local iCloud service; it posts "vok-icloud-close" when its Close button is used. */
+    window.__vokShowIcloud=function(url){try{var old=document.getElementById("vok-icloud-overlay");if(old)old.parentNode.removeChild(old);
+      var o=document.createElement("div");o.id="vok-icloud-overlay";
+      o.style.cssText="position:fixed;inset:0;z-index:2147483002;background:#000;display:flex;align-items:stretch;justify-content:stretch";
+      var f=document.createElement("iframe");f.src=url;f.setAttribute("allow","clipboard-write");f.style.cssText="width:100%;height:100%;border:0;background:#fff";
+      var x=document.createElement("div");x.textContent="×";x.title="Close iCloud Photos";
+      x.style.cssText="position:absolute;top:8px;right:12px;z-index:2;width:26px;height:26px;border-radius:13px;background:rgba(0,0,0,.45);color:#fff;font:18px/26px -apple-system,sans-serif;text-align:center;cursor:pointer;opacity:.75";
+      var close=function(){try{o.parentNode.removeChild(o)}catch(e){}window.removeEventListener("message",onMsg)};
+      x.onclick=close;var onMsg=function(ev){if(ev.data&&ev.data.type==="vok-icloud-close")close()};
+      window.addEventListener("message",onMsg);o.appendChild(f);o.appendChild(x);document.body.appendChild(o)}catch(e){}};
     /* Settings > Version info: an "English patch" section above vivo's own Check for updates button. */
     var settings=function(){var c=document.getElementById("copy-btn");if(!c||!c.parentElement||!c.parentElement.parentElement)return;
       var root=c.parentElement.parentElement.parentElement;if(!root||root.children.length<2)return;var bottom=root.children[1].firstElementChild||root.children[1];
@@ -255,7 +289,7 @@ var audioMsg=function(c){if(c==="toggle")audioToggle();else if(c==="stop")audioS
   else if(c==="credits"){try{el.shell.openExternal("https://github.com/Genymobile/scrcpy")}catch(e){}}};
 el.app.on("before-quit",function(){audioStop(true)});
 el.app.on("web-contents-created",function(e,wc){wc.on("dom-ready",function(){inject(wc);pushAudio([wc])});wc.on("console-message",function(ev,level,msg){if(!mine(wc))return;
-  if(typeof msg==="string"&&msg.indexOf("__VOK_AUDIO__")===0)audioMsg(msg.slice(13));else if(msg==="__VOK_CHECK_UPDATES__")manualCheck(wc);else if(msg==="__VOK_OPEN_ICLOUD__")openICloud();else if(msg==="__VOK_OPEN_GITHUB__"){try{el.shell.openExternal(REPO_URL)}catch(e){}}})});
+  if(typeof msg==="string"&&msg.indexOf("__VOK_AUDIO__")===0)audioMsg(msg.slice(13));else if(msg==="__VOK_CHECK_UPDATES__")manualCheck(wc);else if(msg==="__VOK_OPEN_ICLOUD__"){try{openICloud(wc)}catch(e){}}else if(msg==="__VOK_OPEN_GITHUB__"){try{el.shell.openExternal(REPO_URL)}catch(e){}}})});
 /* Ask the background helper (if installed) to look for a newer translation now that the app has started. */
 var nudge=function(){wake("launch-request")};
 el.app.whenReady().then(function(){fetchInfo();setInterval(fetchInfo,6*3600*1000);setTimeout(nudge,15000);

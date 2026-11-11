@@ -93,16 +93,14 @@ Notes:
 
 ## iCloud Photos
 
-The patch adds an **iCloud Photos** button in the bottom-right corner of the app and an **iCloud Photos** item in the menu bar. It opens a small native window that loads [iCloud.com Photos](https://www.icloud.com/photos/) through Apple's own WebKit engine, so an Apple ID from the US or any other region can sign in.
+The patch adds an **iCloud Photos** button in the bottom-right corner of the app and an **iCloud Photos** item in the menu bar. The panel opens **inside the main vivo Office Kit window** — no separate window. Sign in with your Apple ID and the normal two-factor code, browse your iCloud library, select photos, and download them.
 
-Apple does not give third-party apps access to the iCloud Photo Library, so this is the practical way to bring it into vivo Office Kit. It is a browser-style window, not a background sync: sign in, select photos, and click **Download**.
-
-- **Sign in** with your Apple ID and the two-factor code. This is your normal Apple ID password, as on iCloud.com (not an app-specific password).
-- **Downloads** are saved to `~/Pictures/iCloud Photos`. When iCloud sends several photos as a `.zip`, the helper unpacks it next to the zip.
-- **Open Downloads Folder** is in the window's toolbar and in its **Photos** menu.
-- **Getting them into vivo Office Kit:** drag the downloaded photos into the **Albums** module, or open **File Manager**, go to the phone's `Pictures` or `DCIM` folder, and copy them there so the phone's gallery indexes them.
-- **Requirements:** macOS 12 or newer. The installer builds the window with the Xcode Command Line Tools (`xcode-select --install`). If Swift is unavailable, the **iCloud Photos** button opens iCloud.com in your default browser instead.
-- The helper lives in `~/Library/Application Support/vivo-office-kit-icloud-photos/`.
+- It uses the open-source [pyicloud](https://github.com/timlaing/pyicloud) library through a small service on `127.0.0.1`. The installer puts the service in `~/Library/Application Support/vivo-office-kit-icloud-photos/`; it runs only while vivo Office Kit is open.
+- Sign in with your Apple ID password and the six-digit code shown on your trusted devices. The password is not stored; iCloud session cookies are kept in that support folder.
+- Select photos and click **Download selected**. Files go to `~/Pictures/iCloud Photos`. Live photos download the still image; videos download the video.
+- **Getting them into the app's Albums:** after downloading, drag them into **Albums**, or use **File Manager** to copy them to the phone's `Pictures`/`DCIM` folder.
+- This uses iCloud's private web API through pyicloud, not an Apple-supported API. It can break when Apple changes iCloud; the panel shows the error instead of failing silently.
+- **Requirements:** Python 3 (the Xcode Command Line Tools provide it) and network access for the one-time pyicloud install. If setup fails, the button shows an error and the rest of the app is unaffected.
 
 ## Checking for patch updates from inside the app
 
@@ -171,7 +169,7 @@ vivo's programs, background services or system extensions, and it needs nothing 
 - Points the iCloud calendar preset at Apple's global CalDAV service (`caldav.icloud.com`) instead of the
   China-only `caldav.icloud.com.cn`, so iCloud accounts from the US and other regions can sign in. A
   China-region Apple ID can still be used by typing `https://caldav.icloud.com.cn` in the server address box.
-- Adds an **iCloud Photos** button and menu that open a native WebKit window to iCloud.com Photos, with
+- Adds an **iCloud Photos** panel inside the main window (Apple ID + 2FA, photo grid, download), with
   downloads saved to `Pictures/iCloud Photos` for importing into Albums or copying to the phone.
 - Tells macOS the app supports English (the China edition only declares Chinese), so macOS's own windows
   inside the app, such as the file picker for importing files, and the app's name in the menu bar are English.
@@ -217,8 +215,9 @@ after. In both modes the rebuilt archive is read back and verified before it rep
 | `watcher/reapply.sh` | What the background helper runs after a vivo update, including the update check. |
 | `latest.json` | The newest release of this patch and the vivo versions it fully supports. Read by the helper (updates) and by the patched app (the line under vivo's update window). |
 | `patch/main_prefix.js` | Small startup script added to the app for the mirroring and sign-in language fixes, the iCloud Photos button/menu, and the update check. |
-| `icloud-photos/iCloudPhotos.swift` | Native WebKit window for iCloud Photos (iCloud.com/Photos, with download capture). |
-| `icloud-photos/build.sh` | Builds and installs that window with `swiftc`. |
+| `icloud-photos/service.py` | Local iCloud service (pyicloud): sign-in, 2FA, photo list, thumbnails, downloads. |
+| `icloud-photos/ui.html` | The iCloud Photos panel shown inside the app. |
+| `icloud-photos/setup.sh` | Installs the service and its Python environment. |
 | `patch/en.lproj/InfoPlist.strings` | English app name, so macOS shows its own windows in English. |
 | `patch/locale_extra.tsv` | English for the strings vivo never translated (used in basic mode). |
 
