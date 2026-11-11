@@ -22,7 +22,7 @@ use JSON::PP;
 use File::Basename qw(dirname);
 use Cwd qw(abs_path);
 
-my $PATCH_VERSION = '1.9.1';
+my $PATCH_VERSION = '1.9.2';
 my $BLOCK  = 4 * 1024 * 1024;
 my $MARK   = ";(function(){try{\n/* English patch";   # start of patch/main_prefix.js
 my $DIST   = 'dist/electron';
@@ -169,6 +169,15 @@ sub apply_basic {
     }
     return ($c, $n, $core);
 }
+# The China build hard-codes iCloud's China-only CalDAV host (caldav.icloud.com.cn), so the iCloud
+# calendar preset only accepts Apple IDs from the China region. Point it at Apple's global service
+# instead. The server address box still accepts https://caldav.icloud.com.cn for China-region IDs.
+sub fix_icloud {
+    my ($rel, $c) = @_;
+    return $c unless $rel =~ m{/(?:renderer|app-modules)\.js$};
+    $c =~ s{https://caldav\.icloud\.com\.cn}{https://caldav.icloud.com}g;
+    return $c;
+}
 
 # Decide, for one source archive, what would be changed. Returns { mode, detail, files => [ [rel, node, newdata] ] }.
 sub plan {
@@ -191,6 +200,7 @@ sub plan {
             $n = $c; $basic++; $rules += $cnt;
             $core_r = 1 if $name eq 'renderer.js' && $core; $core_m = 1 if $name eq 'main.js' && $core;
         }
+        $n = fix_icloud($rel, $n);
         push @out, [ $rel, $node, $n ];
     }
     my $mode = !$core_r ? 'none' : $basic ? 'basic' : 'full';

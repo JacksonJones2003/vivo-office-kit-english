@@ -155,6 +155,9 @@ vivo's programs, background services or system extensions, and it needs nothing 
 - Adds English for about 200 strings vivo never translated.
 - Replaces several thousand Chinese strings written directly in the code (recorder, AI features, calendar,
   backup, connection guides, menus). Full mode only.
+- Points the iCloud calendar preset at Apple's global CalDAV service (`caldav.icloud.com`) instead of the
+  China-only `caldav.icloud.com.cn`, so iCloud accounts from the US and other regions can sign in. A
+  China-region Apple ID can still be used by typing `https://caldav.icloud.com.cn` in the server address box.
 - Tells macOS the app supports English (the China edition only declares Chinese), so macOS's own windows
   inside the app, such as the file picker for importing files, and the app's name in the menu bar are English.
   If the app already has an English folder, it is left alone.
