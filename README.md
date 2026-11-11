@@ -93,7 +93,7 @@ Notes:
 
 ## iCloud Photos
 
-The patch adds an **iCloud Photos** button in the bottom-right corner of the app and an **iCloud Photos** item in the menu bar. The panel opens **inside the main vivo Office Kit window** — no separate window. Sign in with your Apple ID and the normal two-factor code, browse your iCloud library, select photos, and download them.
+The patch adds an **iCloud Photos** item to the **File Manager** sidebar (under **Images**), plus an **iCloud Photos** button in the bottom-right corner and an **iCloud Photos** item in the menu bar. On the File Manager page the photo panel opens in the File Manager's **main pane**, with the File Manager sidebar still visible; on other pages the button opens it over the main window. No separate window. Sign in with your Apple ID and the normal two-factor code, browse your iCloud library, select photos, and download them.
 
 - It uses the open-source [pyicloud](https://github.com/timlaing/pyicloud) library through a small service on `127.0.0.1`. The installer puts the service in `~/Library/Application Support/vivo-office-kit-icloud-photos/`; it runs only while vivo Office Kit is open.
 - Sign in with your Apple ID password and the six-digit code shown on your trusted devices. The password is not stored; iCloud session cookies are kept in that support folder.
@@ -169,8 +169,9 @@ vivo's programs, background services or system extensions, and it needs nothing 
 - Points the iCloud calendar preset at Apple's global CalDAV service (`caldav.icloud.com`) instead of the
   China-only `caldav.icloud.com.cn`, so iCloud accounts from the US and other regions can sign in. A
   China-region Apple ID can still be used by typing `https://caldav.icloud.com.cn` in the server address box.
-- Adds an **iCloud Photos** panel inside the main window (Apple ID + 2FA, photo grid, download), with
-  downloads saved to `Pictures/iCloud Photos` for importing into Albums or copying to the phone.
+- Adds an **iCloud Photos** item to File Manager and an in-app iCloud Photos panel (Apple ID + 2FA,
+  photo grid, download), with downloads saved to `Pictures/iCloud Photos` for importing into Albums or
+  copying to the phone.
 - Tells macOS the app supports English (the China edition only declares Chinese), so macOS's own windows
   inside the app, such as the file picker for importing files, and the app's name in the menu bar are English.
   If the app already has an English folder, it is left alone.

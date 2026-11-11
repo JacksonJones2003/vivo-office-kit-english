@@ -103,17 +103,48 @@ var PAGE=function(info){
       if(!p){p=document.createElement("div");p.id="vok-icloud-pill";
         p.style.cssText="position:fixed;right:14px;bottom:44px;z-index:2147483000;display:flex;align-items:center;gap:5px;font:11px/1.3 -apple-system,BlinkMacSystemFont,sans-serif;color:#2f6fe4;background:rgba(47,111,228,.12);border:1px solid rgba(47,111,228,.28);border-radius:11px;padding:4px 10px;cursor:pointer;-webkit-user-select:none;user-select:none;backdrop-filter:blur(6px)";
         p.textContent="iCloud Photos";p.title="Open iCloud Photos — sign in with your Apple ID, download photos to Pictures/iCloud Photos";p.onclick=function(){console.log("__VOK_OPEN_ICLOUD__")};document.body.appendChild(p)}};
-    /* The in-app iCloud Photos panel: an overlay inside this same window. The panel is served by the
-       local iCloud service; it posts "vok-icloud-close" when its Close button is used. */
-    window.__vokShowIcloud=function(url){try{var old=document.getElementById("vok-icloud-overlay");if(old)old.parentNode.removeChild(old);
+    /* The in-app iCloud Photos panel. On the File Manager page it is embedded in the main pane,
+       next to the File Manager sidebar (the sidebar also gets an "iCloud Photos" item). On other
+       pages it covers the window. The panel's Close button posts "vok-icloud-close". */
+    var icloudClose=function(){try{var o=document.getElementById("vok-icloud-overlay");if(o)o.parentNode.removeChild(o);
+      var n=document.getElementById("vok-icloud-nav");if(n)n.classList.remove("active");
+      window.removeEventListener("resize",icloudPlace)}catch(e){}};
+    var icloudPlace=function(){try{var o=document.getElementById("vok-icloud-overlay"),m=document.querySelector(".fm-main");
+      if(!o||!m)return;var r=m.getBoundingClientRect();o.style.left=r.left+"px";o.style.top=r.top+"px";o.style.width=r.width+"px";o.style.height=r.height+"px"}catch(e){}};
+    window.__vokShowIcloud=function(url){try{
+      var old=document.getElementById("vok-icloud-overlay");if(old)old.parentNode.removeChild(old);
+      var main=document.querySelector(".fm-main"),embed=location.hash.indexOf("#/fileManager")===0&&!!main;
       var o=document.createElement("div");o.id="vok-icloud-overlay";
-      o.style.cssText="position:fixed;inset:0;z-index:2147483002;background:#000;display:flex;align-items:stretch;justify-content:stretch";
+      if(embed){var r=main.getBoundingClientRect();o.style.cssText="position:fixed;left:"+r.left+"px;top:"+r.top+"px;width:"+r.width+"px;height:"+r.height+"px;z-index:2147483000;background:#000;display:flex;align-items:stretch;justify-content:stretch";window.addEventListener("resize",icloudPlace)}
+      else{o.style.cssText="position:fixed;inset:0;z-index:2147483000;background:#000;display:flex;align-items:stretch;justify-content:stretch"}
       var f=document.createElement("iframe");f.src=url;f.setAttribute("allow","clipboard-write");f.style.cssText="width:100%;height:100%;border:0;background:#fff";
       var x=document.createElement("div");x.textContent="×";x.title="Close iCloud Photos";
       x.style.cssText="position:absolute;top:8px;right:12px;z-index:2;width:26px;height:26px;border-radius:13px;background:rgba(0,0,0,.45);color:#fff;font:18px/26px -apple-system,sans-serif;text-align:center;cursor:pointer;opacity:.75";
-      var close=function(){try{o.parentNode.removeChild(o)}catch(e){}window.removeEventListener("message",onMsg)};
-      x.onclick=close;var onMsg=function(ev){if(ev.data&&ev.data.type==="vok-icloud-close")close()};
-      window.addEventListener("message",onMsg);o.appendChild(f);o.appendChild(x);document.body.appendChild(o)}catch(e){}};
+      var onMsg=function(ev){if(ev.data&&ev.data.type==="vok-icloud-close"){icloudClose();window.removeEventListener("message",onMsg)}};
+      x.onclick=function(){icloudClose();window.removeEventListener("message",onMsg)};
+      window.addEventListener("message",onMsg);o.appendChild(f);o.appendChild(x);document.body.appendChild(o);
+      var n=document.getElementById("vok-icloud-nav");if(n)n.classList.add("active");
+    }catch(e){}};
+    var fmGuard=function(){try{if(location.hash.indexOf("#/fileManager")!==0){icloudClose();
+      var n=document.getElementById("vok-icloud-nav");if(n&&n.parentNode&&n.parentNode.parentNode)n.parentNode.parentNode.removeChild(n.parentNode)}}catch(e){}};
+    var fmSidebar=function(){try{
+      if(location.hash.indexOf("#/fileManager")!==0)return;
+      var wrap=document.querySelector(".side-bar-item-wrap");if(!wrap)return;
+      var existing=document.getElementById("vok-icloud-nav");
+      if(existing){if(document.getElementById("vok-icloud-overlay"))existing.classList.add("active");return}
+      var items=[].slice.call(wrap.querySelectorAll(".side-bar-item"));
+      var images=items.filter(function(e){return /^Images(\s|\()/.test(e.innerText.trim())})[0]||items[0];if(!images)return;
+      var clone=images.parentElement.cloneNode(true),item=clone.querySelector(".side-bar-item")||clone;
+      item.id="vok-icloud-nav";item.classList.remove("active");item.title="iCloud Photos";
+      var name=item.querySelector(".side-bar-item-name");if(name)name.textContent="iCloud Photos";else item.textContent="iCloud Photos";
+      item.onclick=function(ev){ev.preventDefault();ev.stopPropagation();
+        [].slice.call(wrap.querySelectorAll(".side-bar-item.active")).forEach(function(a){if(a!==item)a.classList.remove("active")});
+        item.classList.add("active");console.log("__VOK_OPEN_ICLOUD__")};
+      images.parentElement.parentElement.insertBefore(clone,images.parentElement.nextSibling);
+      if(document.getElementById("vok-icloud-overlay"))item.classList.add("active");
+      if(!wrap.__vokNavClick){wrap.__vokNavClick=true;wrap.addEventListener("click",function(ev){var n=document.getElementById("vok-icloud-nav");
+        if(n&&!n.contains(ev.target)){n.classList.remove("active");icloudClose()}},true)}
+    }catch(e){}};
     /* Settings > Version info: an "English patch" section above vivo's own Check for updates button. */
     var settings=function(){var c=document.getElementById("copy-btn");if(!c||!c.parentElement||!c.parentElement.parentElement)return;
       var root=c.parentElement.parentElement.parentElement;if(!root||root.children.length<2)return;var bottom=root.children[1].firstElementChild||root.children[1];
@@ -228,7 +259,7 @@ var PAGE=function(info){
     window.__vokAudio=function(s){window.__vokAudioState=s;audioPill()};
     try{matchMedia("(prefers-color-scheme: dark)").addEventListener("change",function(){var b=document.querySelector(".vok-audio-btn");
       if(b&&document.querySelector(".vok-audio-panel")){closePanel();setTimeout(function(){openPanel(b)},50)}})}catch(e){}
-    var render=function(){pending=false;pill();icloudPill();settings();audioPill();var i=window.__vokInfo;if(!i||!i.full_versions)return;
+    var render=function(){pending=false;pill();icloudPill();fmGuard();fmSidebar();settings();audioPill();var i=window.__vokInfo;if(!i||!i.full_versions)return;
       var eds=document.querySelectorAll(".edition");
       for(var k=0;k<eds.length;k++){var ed=eds[k],m=(ed.textContent||"").match(/\d+(?:\.\d+){1,3}/);if(!m||!ed.parentNode)continue;var ver=m[0];
         var box=ed.parentNode,line=box.querySelector(".vok-en-status");
@@ -239,6 +270,7 @@ var PAGE=function(info){
         if(line.textContent!==txt){line.textContent=txt;line.style.color=ok?"#1a8f3c":"#c0392b"}}};
     window.__vokRender=render;
     new MutationObserver(function(){if(!pending){pending=true;setTimeout(render,250)}}).observe(document.documentElement,{childList:true,subtree:true,characterData:true});
+    try{window.addEventListener("hashchange",function(){setTimeout(function(){try{window.__vokRender()}catch(e){}},80)})}catch(e){}
   }
   var p=document.getElementById("vok-patch-pill");if(p){p.removeAttribute("data-min")}
   window.__vokRender();
