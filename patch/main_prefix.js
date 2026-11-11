@@ -110,7 +110,7 @@ var PAGE=function(info){
       var n=document.getElementById("vok-icloud-nav");if(n)n.classList.remove("active");
       window.removeEventListener("resize",icloudPlace)}catch(e){}};
     var icloudPlace=function(){try{var o=document.getElementById("vok-icloud-overlay"),m=document.querySelector(".fm-main");
-      if(!o||!m)return;var r=m.getBoundingClientRect();o.style.left=r.left+"px";o.style.top=r.top+"px";o.style.width=r.width+"px";o.style.height=r.height+"px"}catch(e){}};
+      if(!o||!m||o.__vokFull)return;var r=m.getBoundingClientRect();o.style.left=r.left+"px";o.style.top=r.top+"px";o.style.width=r.width+"px";o.style.height=r.height+"px"}catch(e){}};
     window.__vokShowIcloud=function(url){try{
       var old=document.getElementById("vok-icloud-overlay");if(old)old.parentNode.removeChild(old);
       var main=document.querySelector(".fm-main"),embed=location.hash.indexOf("#/fileManager")===0&&!!main;
@@ -120,7 +120,8 @@ var PAGE=function(info){
       var f=document.createElement("iframe");f.src=url;f.setAttribute("allow","clipboard-write");f.style.cssText="width:100%;height:100%;border:0;background:#fff";
       var x=document.createElement("div");x.textContent="×";x.title="Close iCloud Photos";
       x.style.cssText="position:absolute;top:8px;right:12px;z-index:2;width:26px;height:26px;border-radius:13px;background:rgba(0,0,0,.45);color:#fff;font:18px/26px -apple-system,sans-serif;text-align:center;cursor:pointer;opacity:.75";
-      var onMsg=function(ev){if(ev.data&&ev.data.type==="vok-icloud-close"){icloudClose();window.removeEventListener("message",onMsg)}};
+      var onMsg=function(ev){if(ev.data&&ev.data.type==="vok-icloud-close"){icloudClose();window.removeEventListener("message",onMsg)}
+        else if(ev.data&&ev.data.type==="vok-icloud-viewer"&&embed){if(ev.data.open){o.__vokFull=true;o.style.cssText="position:fixed;inset:0;z-index:2147483000;background:#000;display:flex;align-items:stretch;justify-content:stretch"}else{o.__vokFull=false;icloudPlace()}}};
       x.onclick=function(){icloudClose();window.removeEventListener("message",onMsg)};
       window.addEventListener("message",onMsg);o.appendChild(f);o.appendChild(x);document.body.appendChild(o);
       var n=document.getElementById("vok-icloud-nav");if(n)n.classList.add("active");

@@ -29,6 +29,7 @@ from urllib.parse import parse_qs, urlparse
 BASE_DIR = os.environ.get("VOK_ICLOUD_DIR") or os.path.dirname(os.path.abspath(__file__))
 COOKIE_DIR = os.path.join(BASE_DIR, "cookies")
 THUMB_DIR = os.path.join(BASE_DIR, "thumbnails")
+PREVIEW_DIR = os.path.join(BASE_DIR, "previews")
 ACCOUNT_FILE = os.path.join(BASE_DIR, "account.json")
 SERVER_FILE = os.path.join(BASE_DIR, "server.json")
 LOG_FILE = os.path.join(BASE_DIR, "service.log")
@@ -39,6 +40,7 @@ TOKEN = secrets.token_urlsafe(24)
 os.makedirs(BASE_DIR, exist_ok=True)
 os.makedirs(COOKIE_DIR, exist_ok=True)
 os.makedirs(THUMB_DIR, exist_ok=True)
+os.makedirs(PREVIEW_DIR, exist_ok=True)
 os.makedirs(DOWNLOAD_DIR, exist_ok=True)
 
 try:
@@ -226,6 +228,85 @@ def thumb_bytes(asset):
         pass
     ctype = (getattr(asset, "versions", {}).get(key) or {}).get("type") or "image/jpeg"
     return data, ctype
+
+
+def _displayable(ctype: str | None) -> bool:
+    return (ctype or "").lower() in ("image/jpeg", "image/png", "image/webp", "image/gif")
+
+
+def full_bytes(asset):
+    path = os.path.join(PREVIEW_DIR, asset.id + ".v2.jpg")
+    if os.path.exists(path):
+        try:
+            with open(path, "rb") as fh:
+                return fh.read(), "image/jpeg"
+        except Exception:
+            pass
+    if MOCK:
+        return mock_thumb(asset), "image/svg+xml"
+    versions = getattr(asset, "versions", {}) or {}
+    if asset.item_type == "movie":
+        keys = [k for k in ("thumb_video", "thumb_image", "thumb") if k in versions and versions[k].get("url")]
+        for key in keys:
+            with LOCK:
+                data = asset.download(key)
+            if data:
+                return _cache_preview(asset, data, (versions.get(key) or {}).get("type") or "image/jpeg", path)
+        return None, None
+    # Prefer a full-size JPEG alternate (HEIC originals usually have one), then original, then medium.
+    keys = [k for k in ("alternative", "original", "medium", "thumb") if k in versions and versions[k].get("url")]
+    for key in keys:
+        ctype = (versions.get(key) or {}).get("type")
+        if not _displayable(ctype) and key not in ("alternative", "original"):
+            continue
+        with LOCK:
+            data = asset.download(key)
+        if not data:
+            continue
+        if _displayable(ctype):
+            return _cache_preview(asset, data, ctype, path)
+        # HEIC/HEIF original: convert with macOS sips, then fall back to medium if that fails.
+        converted = _convert_heic(data, path)
+        if converted:
+            return converted, "image/jpeg"
+    for key in ("medium", "thumb"):
+        if key in versions and versions[key].get("url"):
+            with LOCK:
+                data = asset.download(key)
+            if data:
+                return _cache_preview(asset, data, (versions.get(key) or {}).get("type") or "image/jpeg", path)
+    return None, None
+
+
+def _cache_preview(asset, data, ctype, path):
+    try:
+        with open(path, "wb") as fh:
+            fh.write(data)
+    except Exception:
+        pass
+    return data, ctype
+
+
+def _convert_heic(data, path):
+    if not os.path.exists("/usr/bin/sips"):
+        return None
+    tmp = path + ".heic"
+    try:
+        with open(tmp, "wb") as fh:
+            fh.write(data)
+        proc = subprocess.run(["/usr/bin/sips", "-s", "format", "jpeg", tmp, "--out", path],
+                              stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        if proc.returncode != 0 or not os.path.exists(path):
+            return None
+        with open(path, "rb") as fh:
+            return fh.read()
+    except Exception:
+        return None
+    finally:
+        try:
+            os.remove(tmp)
+        except Exception:
+            pass
 
 
 def sanitize_filename(name: str) -> str:
@@ -561,6 +642,19 @@ class Handler(BaseHTTPRequestHandler):
                 data, ctype = None, None
             if not data:
                 return self.send_json({"ok": False, "message": "No thumbnail"}, 404)
+            return self.send_bytes(data, ctype or "image/jpeg")
+        if path == "/api/full":
+            asset_id = query.get("id", [""])[0]
+            asset = get_asset(asset_id)
+            if asset is None:
+                return self.send_json({"ok": False, "message": "Photo not found"}, 404)
+            try:
+                data, ctype = full_bytes(asset)
+            except Exception as exc:
+                log("preview failed: " + str(exc))
+                data, ctype = None, None
+            if not data:
+                return self.send_json({"ok": False, "message": "No preview"}, 404)
             return self.send_bytes(data, ctype or "image/jpeg")
         if path == "/api/job":
             job_id = query.get("id", [""])[0]
