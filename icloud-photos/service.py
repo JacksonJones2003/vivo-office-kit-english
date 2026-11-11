@@ -45,6 +45,7 @@ os.makedirs(DOWNLOAD_DIR, exist_ok=True)
 
 try:
     from pyicloud import PyiCloudService
+    from pyicloud.services.photos import DirectionEnum
     from pyicloud.exceptions import (
         PyiCloudAcceptTermsException,
         PyiCloudAccountLockedException,
@@ -61,6 +62,7 @@ except Exception as exc:  # pragma: no cover - reported through the UI
     PyiCloud2SARequiredException = Exception  # type: ignore
     PyiCloudAccountLockedException = Exception  # type: ignore
     PyiCloudAcceptTermsException = Exception  # type: ignore
+    DirectionEnum = None  # type: ignore
     IMPORT_ERROR = str(exc)
 else:
     IMPORT_ERROR = ""
@@ -130,6 +132,13 @@ def init_album() -> None:
     global ALBUM, PHOTO_ITER, TOTAL, CACHE, ASSETS, EXHAUSTED, LAST_ERROR, STATE
     with LOCK:
         ALBUM = API.photos.all
+        if DirectionEnum is not None:
+            try:
+                # The album's default DESCENDING iterator starts at the oldest item; the
+                # ASCENDING page begins at the newest item, which is what the grid wants.
+                ALBUM._direction = DirectionEnum.ASCENDING
+            except Exception:
+                pass
         PHOTO_ITER = ALBUM.photos
         TOTAL = len(ALBUM)
         CACHE = []

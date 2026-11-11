@@ -97,6 +97,7 @@ The patch adds an **iCloud Photos** item to the **File Manager** sidebar (under 
 
 - It uses the open-source [pyicloud](https://github.com/timlaing/pyicloud) library through a small service on `127.0.0.1`. The installer puts the service in `~/Library/Application Support/vivo-office-kit-icloud-photos/`; it runs only while vivo Office Kit is open.
 - Sign in with your Apple ID password and the six-digit code shown on your trusted devices. The password is not stored; iCloud session cookies are kept in that support folder.
+- The grid lists the newest photos first, with older ones below.
 - **View a photo full-size:** click the photo itself (not its checkmark) in the grid. The viewer fills the app window; use **‹ ›** or the arrow keys to move, **Esc** or **Close** to return, and **Select**/**Download** for the current photo. The checkmark on a thumbnail selects it without opening it.
 - Select photos with their checkmarks and click **Download selected**. Files go to `~/Pictures/iCloud Photos`. Live photos download the still image; videos download the video.
 - **Getting them into the app's Albums:** after downloading, drag them into **Albums**, or use **File Manager** to copy them to the phone's `Pictures`/`DCIM` folder.
