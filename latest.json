@@ -1,10 +1,10 @@
 {
-  "version": "1.9.1",
-  "zip_url": "https://github.com/JacksonJones2003/vivo-office-kit-english-mac/releases/download/v1.9.1/vivo-office-kit-english-mac-v1.9.1.zip",
-  "zip_sha256": "865e1dae3ae8f5f239beef2b8f0539145521445d5c75b7dc0ac14d2b87eea656",
+  "version": "1.9.6",
+  "zip_url": "https://github.com/JacksonJones2003/vivo-office-kit-english-mac/releases/download/v1.9.6/vivo-office-kit-english-mac-v1.9.6.zip",
+  "zip_sha256": "d300fdea8facff9e1fd01061878db8f3b71df6456ce56c4dacc4f30fd5393a8f",
   "full_versions": [
     "7.0.5",
     "7.0.6"
   ],
-  "notes": "English incoming-call window. Full English for vivo Office Kit 7.0.5 and 7.0.6."
+  "notes": "iCloud Photos inside the app: File Manager sidebar, full-size viewer, newest-first order. Global iCloud Calendar endpoint and all previous English fixes. Full English for vivo Office Kit 7.0.5 and 7.0.6."
 }
