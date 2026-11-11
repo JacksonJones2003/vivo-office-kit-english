@@ -91,6 +91,19 @@ Notes:
 - **Apps can opt out:** some apps block their audio from being captured, and their sound won't come through.
 - **Separate from vivo:** Wi-Fi audio runs its own copy of Android's `adb` on its own port, so it doesn't interfere with vivo Office Kit.
 
+## iCloud Photos
+
+The patch adds an **iCloud Photos** button in the bottom-right corner of the app and an **iCloud Photos** item in the menu bar. It opens a small native window that loads [iCloud.com Photos](https://www.icloud.com/photos/) through Apple's own WebKit engine, so an Apple ID from the US or any other region can sign in.
+
+Apple does not give third-party apps access to the iCloud Photo Library, so this is the practical way to bring it into vivo Office Kit. It is a browser-style window, not a background sync: sign in, select photos, and click **Download**.
+
+- **Sign in** with your Apple ID and the two-factor code. This is your normal Apple ID password, as on iCloud.com (not an app-specific password).
+- **Downloads** are saved to `~/Pictures/iCloud Photos`. When iCloud sends several photos as a `.zip`, the helper unpacks it next to the zip.
+- **Open Downloads Folder** is in the window's toolbar and in its **Photos** menu.
+- **Getting them into vivo Office Kit:** drag the downloaded photos into the **Albums** module, or open **File Manager**, go to the phone's `Pictures` or `DCIM` folder, and copy them there so the phone's gallery indexes them.
+- **Requirements:** macOS 12 or newer. The installer builds the window with the Xcode Command Line Tools (`xcode-select --install`). If Swift is unavailable, the **iCloud Photos** button opens iCloud.com in your default browser instead.
+- The helper lives in `~/Library/Application Support/vivo-office-kit-icloud-photos/`.
+
 ## Checking for patch updates from inside the app
 
 The main window of the patched app has a small **English patch vX · Check for updates** button in the bottom-right
@@ -158,6 +171,8 @@ vivo's programs, background services or system extensions, and it needs nothing 
 - Points the iCloud calendar preset at Apple's global CalDAV service (`caldav.icloud.com`) instead of the
   China-only `caldav.icloud.com.cn`, so iCloud accounts from the US and other regions can sign in. A
   China-region Apple ID can still be used by typing `https://caldav.icloud.com.cn` in the server address box.
+- Adds an **iCloud Photos** button and menu that open a native WebKit window to iCloud.com Photos, with
+  downloads saved to `Pictures/iCloud Photos` for importing into Albums or copying to the phone.
 - Tells macOS the app supports English (the China edition only declares Chinese), so macOS's own windows
   inside the app, such as the file picker for importing files, and the app's name in the menu bar are English.
   If the app already has an English folder, it is left alone.
@@ -201,7 +216,9 @@ after. In both modes the rebuilt archive is read back and verified before it rep
 | `watcher/setup-watcher.sh` | Turns automatic re-patching on or off. |
 | `watcher/reapply.sh` | What the background helper runs after a vivo update, including the update check. |
 | `latest.json` | The newest release of this patch and the vivo versions it fully supports. Read by the helper (updates) and by the patched app (the line under vivo's update window). |
-| `patch/main_prefix.js` | Small startup script added to the app for the mirroring and sign-in language fixes. |
+| `patch/main_prefix.js` | Small startup script added to the app for the mirroring and sign-in language fixes, the iCloud Photos button/menu, and the update check. |
+| `icloud-photos/iCloudPhotos.swift` | Native WebKit window for iCloud Photos (iCloud.com/Photos, with download capture). |
+| `icloud-photos/build.sh` | Builds and installs that window with `swiftc`. |
 | `patch/en.lproj/InfoPlist.strings` | English app name, so macOS shows its own windows in English. |
 | `patch/locale_extra.tsv` | English for the strings vivo never translated (used in basic mode). |
 

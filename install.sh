@@ -107,6 +107,12 @@ if [ "$ACTION" = "restore" ]; then
 fi
 if [ -n "$AUTO" ]; then echo "$OUT"; exit 0; fi
 
+# Optional native iCloud Photos window (uses WebKit; iCloud.com does not support the app's Electron browser).
+# If Swift is unavailable the app's iCloud Photos button still opens iCloud.com in the default browser.
+if [ -x "$DIR/icloud-photos/build.sh" ]; then
+  "$DIR/icloud-photos/build.sh" >/dev/null 2>&1 || echo "Note: the native iCloud Photos window could not be built (needs Xcode Command Line Tools). The button will open iCloud.com in your browser instead."
+fi
+
 if [ -x "$WATCH" ]; then
   if [ "$("$WATCH" status)" = "on" ]; then
     W_OUT="$("$WATCH" install 2>&1)" || ask "The English patch was installed, but refreshing the automatic re-patching helper reported a problem:

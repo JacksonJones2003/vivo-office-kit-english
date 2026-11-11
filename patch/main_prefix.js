@@ -30,6 +30,17 @@ var RELEASES_URL="https://github.com/JacksonJones2003/vivo-office-kit-english-ma
 var WATCHER=path.join(os.homedir(),"Library/LaunchAgents/io.github.jacksonjones2003.vivo-english-watcher.plist");
 var WDIR=path.join(os.homedir(),"Library/Application Support/vivo-office-kit-english-watcher");
 var REPO_URL="https://github.com/JacksonJones2003/vivo-office-kit-english-mac";
+/* iCloud Photos: Apple does not expose the iCloud Photo Library to apps. A small native window built by
+   the installer (WebKit/iCloud.com) is launched from the app's menu and from a button in the main window.
+   Downloads are saved to ~/Pictures/iCloud Photos, ready to drag into Albums or copy to the phone. */
+var ICLOUD_APP=path.join(os.homedir(),"Library/Application Support/vivo-office-kit-icloud-photos/iCloud Photos.app");
+var ICLOUD_DL=path.join(os.homedir(),"Pictures","iCloud Photos");
+var openICloud=function(){try{if(fs.existsSync(ICLOUD_APP)){var c=spawn.call(cp,"/usr/bin/open",[ICLOUD_APP],{stdio:"ignore",detached:true});c.on("error",function(){});c.unref();return}
+  el.shell.openExternal("https://www.icloud.com/photos/")}catch(e){}};
+var openICloudFolder=function(){try{fs.mkdirSync(ICLOUD_DL,{recursive:true})}catch(e){}try{el.shell.openPath(ICLOUD_DL)}catch(e){}};
+var addICloudMenu=function(){try{var m=el.Menu.getApplicationMenu();if(!m||m.__vokIcloud)return;
+  var sub=new el.Menu();sub.append(new el.MenuItem({label:"Open iCloud Photos…",click:openICloud}));sub.append(new el.MenuItem({label:"Open Downloads Folder",click:openICloudFolder}));
+  var item=new el.MenuItem({label:"iCloud Photos",submenu:sub});m.append(item);m.__vokIcloud=true}catch(e){}};
 var MARK=(function(){try{return fs.readFileSync(path.join(process.resourcesPath,"app.asar.english-patch"),"utf8")}catch(e){return ""}})();
 var mk=function(k){var m=MARK.match(new RegExp("^"+k+"=(.*)$","m"));return m?m[1].trim():""};
 var PATCH=/^[\d.]+$/.test(mk("patch"))?mk("patch"):"";
@@ -63,6 +74,12 @@ var PAGE=function(info){
       p.appendChild(l);p.appendChild(m)};
     var pill=function(){if(!/\/index\.html$/.test(location.pathname)||!document.body)return;var p=document.getElementById("vok-patch-pill");
       if(!p){p=document.createElement("div");p.id="vok-patch-pill";document.body.appendChild(p)}draw(p)};
+    /* A small "iCloud Photos" button above the English patch pill. It asks the main process to open the
+       native iCloud Photos window (WebKit/iCloud.com); downloads land in Pictures/iCloud Photos. */
+    var icloudPill=function(){if(!/\/index\.html$/.test(location.pathname)||!document.body)return;var p=document.getElementById("vok-icloud-pill");
+      if(!p){p=document.createElement("div");p.id="vok-icloud-pill";
+        p.style.cssText="position:fixed;right:14px;bottom:44px;z-index:2147483000;display:flex;align-items:center;gap:5px;font:11px/1.3 -apple-system,BlinkMacSystemFont,sans-serif;color:#2f6fe4;background:rgba(47,111,228,.12);border:1px solid rgba(47,111,228,.28);border-radius:11px;padding:4px 10px;cursor:pointer;-webkit-user-select:none;user-select:none;backdrop-filter:blur(6px)";
+        p.textContent="iCloud Photos";p.title="Open iCloud Photos — sign in with your Apple ID, download photos to Pictures/iCloud Photos";p.onclick=function(){console.log("__VOK_OPEN_ICLOUD__")};document.body.appendChild(p)}};
     /* Settings > Version info: an "English patch" section above vivo's own Check for updates button. */
     var settings=function(){var c=document.getElementById("copy-btn");if(!c||!c.parentElement||!c.parentElement.parentElement)return;
       var root=c.parentElement.parentElement.parentElement;if(!root||root.children.length<2)return;var bottom=root.children[1].firstElementChild||root.children[1];
@@ -177,7 +194,7 @@ var PAGE=function(info){
     window.__vokAudio=function(s){window.__vokAudioState=s;audioPill()};
     try{matchMedia("(prefers-color-scheme: dark)").addEventListener("change",function(){var b=document.querySelector(".vok-audio-btn");
       if(b&&document.querySelector(".vok-audio-panel")){closePanel();setTimeout(function(){openPanel(b)},50)}})}catch(e){}
-    var render=function(){pending=false;pill();settings();audioPill();var i=window.__vokInfo;if(!i||!i.full_versions)return;
+    var render=function(){pending=false;pill();icloudPill();settings();audioPill();var i=window.__vokInfo;if(!i||!i.full_versions)return;
       var eds=document.querySelectorAll(".edition");
       for(var k=0;k<eds.length;k++){var ed=eds[k],m=(ed.textContent||"").match(/\d+(?:\.\d+){1,3}/);if(!m||!ed.parentNode)continue;var ver=m[0];
         var box=ed.parentNode,line=box.querySelector(".vok-en-status");
@@ -238,8 +255,9 @@ var audioMsg=function(c){if(c==="toggle")audioToggle();else if(c==="stop")audioS
   else if(c==="credits"){try{el.shell.openExternal("https://github.com/Genymobile/scrcpy")}catch(e){}}};
 el.app.on("before-quit",function(){audioStop(true)});
 el.app.on("web-contents-created",function(e,wc){wc.on("dom-ready",function(){inject(wc);pushAudio([wc])});wc.on("console-message",function(ev,level,msg){if(!mine(wc))return;
-  if(typeof msg==="string"&&msg.indexOf("__VOK_AUDIO__")===0)audioMsg(msg.slice(13));else if(msg==="__VOK_CHECK_UPDATES__")manualCheck(wc);else if(msg==="__VOK_OPEN_GITHUB__"){try{el.shell.openExternal(REPO_URL)}catch(e){}}})});
+  if(typeof msg==="string"&&msg.indexOf("__VOK_AUDIO__")===0)audioMsg(msg.slice(13));else if(msg==="__VOK_CHECK_UPDATES__")manualCheck(wc);else if(msg==="__VOK_OPEN_ICLOUD__")openICloud();else if(msg==="__VOK_OPEN_GITHUB__"){try{el.shell.openExternal(REPO_URL)}catch(e){}}})});
 /* Ask the background helper (if installed) to look for a newer translation now that the app has started. */
 var nudge=function(){wake("launch-request")};
-el.app.whenReady().then(function(){fetchInfo();setInterval(fetchInfo,6*3600*1000);setTimeout(nudge,15000)}).catch(function(){});
+el.app.whenReady().then(function(){fetchInfo();setInterval(fetchInfo,6*3600*1000);setTimeout(nudge,15000);
+  setTimeout(addICloudMenu,2500);setInterval(addICloudMenu,10000);el.app.on("browser-window-focus",addICloudMenu);el.app.on("activate",addICloudMenu)}).catch(function(){});
 }catch(e){}})();
