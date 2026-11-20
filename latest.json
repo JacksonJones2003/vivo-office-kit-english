@@ -1,10 +1,10 @@
 {
-  "version": "1.9.6",
-  "zip_url": "https://github.com/JacksonJones2003/vivo-office-kit-english-mac/releases/download/v1.9.6/vivo-office-kit-english-mac-v1.9.6.zip",
-  "zip_sha256": "d300fdea8facff9e1fd01061878db8f3b71df6456ce56c4dacc4f30fd5393a8f",
+  "version": "1.9.8",
+  "zip_url": "https://github.com/JacksonJones2003/vivo-office-kit-english/releases/download/v1.9.8/vivo-office-kit-english-mac-v1.9.8.zip",
+  "zip_sha256": "27d1144317bd7385dd6020276e9de14474cefa4ded75afe5b2e46b7a6ffd28c5",
   "full_versions": [
     "7.0.5",
     "7.0.6"
   ],
-  "notes": "iCloud Photos inside the app: File Manager sidebar, full-size viewer, newest-first order. Global iCloud Calendar endpoint and all previous English fixes. Full English for vivo Office Kit 7.0.5 and 7.0.6."
+  "notes": "Phone alarms from the vivo Clock app now arrive as native macOS notifications, and cancelling or snoozing the alarm on the phone updates the Mac notification. iCloud Photos in the File Manager, newest-first, full-size viewer; global iCloud Calendar endpoint; all previous English fixes. Full English for vivo Office Kit 7.0.5 and 7.0.6. Timer-to-Clock sync is not included (macOS blocks third-party Clock timers)."
 }

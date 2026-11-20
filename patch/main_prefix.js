@@ -61,9 +61,65 @@ var openICloud=function(wc){var target=wc||((el.BrowserWindow.getFocusedWindow()
   startIcloud(function(url){if(url)showIcloud(target,url);else el.dialog.showMessageBox({type:"info",message:"iCloud Photos is not set up",detail:"Run the English patch installer again to install the iCloud Photos service.",buttons:["OK"]}).catch(function(){})})};
 var openICloudFolder=function(){try{fs.mkdirSync(ICLOUD_DL,{recursive:true})}catch(e){}try{el.shell.openPath(ICLOUD_DL)}catch(e){}};
 el.app.on("before-quit",function(){try{var s=JSON.parse(fs.readFileSync(ICLOUD_STATE,"utf8"));if(s&&s.pid)process.kill(s.pid)}catch(e){}try{if(icloudProc)icloudProc.kill()}catch(e){}});
+el.app.on("before-quit",function(){try{if(ALARM_TIMEOUT)clearTimeout(ALARM_TIMEOUT);if(TIMER_ALERT)clearTimeout(TIMER_ALERT);try{closeAlarmNotification()}catch(e){}}catch(e){}});
 var addICloudMenu=function(){try{var m=el.Menu.getApplicationMenu();if(!m||m.__vokIcloud)return;
   var sub=new el.Menu();sub.append(new el.MenuItem({label:"Open iCloud Photos…",click:function(){openICloud()}}));sub.append(new el.MenuItem({label:"Open Downloads Folder",click:openICloudFolder}));
   var item=new el.MenuItem({label:"iCloud Photos",submenu:sub});m.append(item);m.__vokIcloud=true}catch(e){}};
+/* Phone timer mirror. The vivo Clock (com.android.BBKClock) posts a SuperX notification while a timer
+   runs. We read it over wireless ADB and show a matching countdown in the app. Setting, pausing and
+   cancelling stay on the phone; the Mac only mirrors. */
+var TIMER_ADB=(function(){var c=["/opt/homebrew/bin/adb","/usr/local/bin/adb",path.join(os.homedir(),"Library/Android/sdk/platform-tools/adb"),path.join(process.resourcesPath,"adb","adb")];for(var i=0;i<c.length;i++){try{if(fs.existsSync(c[i]))return c[i]}catch(e){}}return ""})();
+var TIMER_PORT="",TIMER_ALERT=null,TIMER_LAST=null,TIMER_STATE={active:false};
+var tlog=function(m){try{fs.appendFileSync(path.join(el.app.getPath("userData"),"phone-timer.log"),new Date().toISOString()+" "+m+"\n")}catch(e){}};
+var adbCall=function(port,args,cb){if(!TIMER_ADB||!port)return cb("no adb","");try{cp.execFile(TIMER_ADB,["-P",port].concat(args),{timeout:5000,maxBuffer:4*1024*1024},function(err,stdout){cb(err?String(err.message||err):"",stdout||"")})}catch(e){cb(String(e),"")}};
+var findTimerPort=function(cb){if(!TIMER_ADB)return cb("");var ports=["5038","5037"],i=0;var next=function(){if(i>=ports.length)return cb("");var p=ports[i++];adbCall(p,["devices"],function(err,out){if(!err&&/\tdevice\b/.test(out))return cb(p);next()})};next()};
+var timerDurationMs=function(text){var m=/baseInfos\.content=([^\]\}]+)/.exec(text),v=m?m[1].trim():"";if(!v){var d=/describeShort=([^,\]\s]+)/.exec(text);v=d?d[1]:""}var h=/(\d+)\s*h/.exec(v),mi=/(\d+)\s*m/.exec(v),se=/(\d+)\s*s/.exec(v);return ((h?+h[1]:0)*3600+(mi?+mi[1]:0)*60+(se?+se[1]:0))*1000};
+var timerClockMs=function(v){var p=String(v).split(":").map(Number);if(p.length===3)return (p[0]*3600+p[1]*60+p[2])*1000;if(p.length===2)return (p[0]*60+p[1])*1000;return 0};
+var parseTimer=function(text){if(text.indexOf("scene=String (TIMER)")<0)return {active:false};var wm=/when=(\d+)\//.exec(text);if(!wm)return {active:false};var when=+wm[1],now=Date.now(),total=timerDurationMs(text),paused=/Off#Start/.test(text);
+  if(paused){var tm=/baseInfos\.title=(\d{1,2}(?::\d{2}){1,2})/.exec(text)||/coreInfoShort=(\d{1,2}(?::\d{2}){1,2})/.exec(text);var rem=tm?timerClockMs(tm[1]):0;return {active:true,paused:true,remainingMs:rem,totalMs:total||rem,endsAt:0,when:when,updatedAt:now}}
+  var dur=total;if(TIMER_LAST&&TIMER_LAST.paused&&TIMER_LAST.remainingMs&&when>(TIMER_LAST.when||0)+500)dur=TIMER_LAST.remainingMs;
+  var endsAt=when+dur;return {active:true,paused:false,remainingMs:Math.max(0,endsAt-now),totalMs:total||dur,endsAt:endsAt,when:when,updatedAt:now}};
+var pushTimer=function(st){TIMER_STATE=st;if(!st.active)TIMER_LAST=null;else TIMER_LAST=st;
+  if(TIMER_ALERT){clearTimeout(TIMER_ALERT);TIMER_ALERT=null}
+  if(st.active&&!st.paused&&st.endsAt&&st.endsAt>Date.now()){var delay=Math.min(st.endsAt-Date.now(),2147480000);TIMER_ALERT=setTimeout(function(){TIMER_ALERT=null;try{var N=el.Notification;if(N&&N.isSupported())new N({title:"Phone timer",body:"Time's up"}).show()}catch(e){}try{el.shell.beep()}catch(e){}},delay)}
+  var payload=JSON.stringify(st);
+  el.webContents.getAllWebContents().forEach(function(wc){try{if(!wc.isDestroyed()&&/^file:/.test(wc.getURL()))wc.executeJavaScript("window.__vokTimer&&window.__vokTimer("+payload+")",true).catch(function(){})}catch(e){}})};
+var pollTimer=function(){
+  if(!TIMER_ADB){pushTimer({active:false});return setTimeout(pollTimer,10000)}
+  if(!TIMER_PORT){findTimerPort(function(p){TIMER_PORT=p;if(p)tlog("adb port "+p);pollTimer()});return}
+  adbCall(TIMER_PORT,["shell","cmd notification list"],function(err,out){
+    if(err){tlog("timer list error: "+err);TIMER_PORT="";pushTimer({active:false});return setTimeout(pollTimer,5000)}
+    var line=out.split("\n").filter(function(l){return l.indexOf("com.android.BBKClock")>=0&&l.indexOf("VIVO_SUPERX_TAG")>=0})[0];
+    if(!line){pushTimer({active:false});return setTimeout(pollTimer,2000)}
+    var key=line.trim();
+    adbCall(TIMER_PORT,["shell","cmd notification get '"+key+"'"],function(e2,txt){
+      if(e2){pushTimer({active:false})}else{pushTimer(parseTimer(txt))}
+      setTimeout(pollTimer,2000)})})};
+var showPhoneTimer=function(){if(!TIMER_ADB||!TIMER_PORT)return;adbCall(TIMER_PORT,["shell","am start -n com.android.BBKClock/.Timer"],function(){})};
+var startTimerWatcher=function(){tlog("timer watcher start adb="+TIMER_ADB);pollTimer()};
+/* Phone alarms: read the next Clock alarm and post a normal macOS notification when it fires.
+   Alarms are set/cancelled on the phone. When the phone alarm is cancelled or changed, the local
+   notification is cancelled too (and closed if it was already delivered). */
+var ALARM_NEXT=0,ALARM_TIMEOUT=null,ALARM_NOTIFICATION=null,ALARM_FIRED=false;
+var closeAlarmNotification=function(){if(ALARM_NOTIFICATION){try{ALARM_NOTIFICATION.close()}catch(e){}ALARM_NOTIFICATION=null}};
+var fireAlarm=function(){if(ALARM_FIRED)return;ALARM_FIRED=true;try{var N=el.Notification;if(N&&N.isSupported()){ALARM_NOTIFICATION=new N({title:"Phone alarm",body:"Your phone alarm is ringing"});ALARM_NOTIFICATION.show()}}catch(e){}};
+var scheduleAlarm=function(nextAt){if(ALARM_TIMEOUT){clearTimeout(ALARM_TIMEOUT);ALARM_TIMEOUT=null}closeAlarmNotification();ALARM_FIRED=false;ALARM_NEXT=nextAt;
+  if(!nextAt||nextAt<=0)return;
+  var wait=nextAt-Date.now();
+  if(wait<=1000){fireAlarm();return}
+  ALARM_TIMEOUT=setTimeout(function(){ALARM_TIMEOUT=null;fireAlarm()},Math.min(wait,2147480000))};
+var pollAlarm=function(){
+  if(!TIMER_ADB)return setTimeout(pollAlarm,30000);
+  if(!TIMER_PORT){findTimerPort(function(p){TIMER_PORT=p;pollAlarm()});return}
+  adbCall(TIMER_PORT,["shell","dumpsys alarm | grep -m1 -B6 -A4 'com.cn.google.AlertClock.ALARM_ALERT'"],function(err,out){
+    if(err){tlog("alarm poll error: "+err);return setTimeout(pollAlarm,30000)}
+    var m=/Alarm\{[^}]*origWhen\s+(\d{13})[^}]*ALARM_ALERT/.exec(out)||/origWhen[= ](\d{13})[\s\S]{0,400}?ALARM_ALERT/.exec(out);
+    if(!m){if(ALARM_TIMEOUT){clearTimeout(ALARM_TIMEOUT);ALARM_TIMEOUT=null}closeAlarmNotification();ALARM_NEXT=0;ALARM_FIRED=false;return setTimeout(pollAlarm,10000)}
+    var nextAt=+m[1];
+    if(nextAt!==ALARM_NEXT)scheduleAlarm(nextAt);
+    else if(nextAt<=Date.now()+1000&&!ALARM_FIRED)fireAlarm();
+    setTimeout(pollAlarm,10000)})};
+var startAlarmWatcher=function(){tlog("alarm watcher start");pollAlarm()};
 var MARK=(function(){try{return fs.readFileSync(path.join(process.resourcesPath,"app.asar.english-patch"),"utf8")}catch(e){return ""}})();
 var mk=function(k){var m=MARK.match(new RegExp("^"+k+"=(.*)$","m"));return m?m[1].trim():""};
 var PATCH=/^[\d.]+$/.test(mk("patch"))?mk("patch"):"";
@@ -146,6 +202,48 @@ var PAGE=function(info){
       if(!wrap.__vokNavClick){wrap.__vokNavClick=true;wrap.addEventListener("click",function(ev){var n=document.getElementById("vok-icloud-nav");
         if(n&&!n.contains(ev.target)){n.classList.remove("active");icloudClose()}},true)}
     }catch(e){}};
+    /* Phone timer + next alarm: one compact pill in the corner and a small panel. The main process
+       reads the phone's Clock notification and alarm list over ADB and calls __vokTimer / __vokAlarm. */
+    var fmtClock=function(ms){var s=Math.max(0,Math.ceil((ms||0)/1000)),h=Math.floor(s/3600),m=Math.floor((s%3600)/60),x=s%60;return (h?h+":"+String(m).padStart(2,"0"):m)+":"+String(x).padStart(2,"0")};
+    var fmtAlarm=function(ts){try{return new Date(ts).toLocaleTimeString(undefined,{hour:"numeric",minute:"2-digit"})}catch(e){return ""}};
+    var humanLeft=function(ms){if(ms<0)return "now";var s=Math.floor(ms/1000),h=Math.floor(s/3600),m=Math.floor((s%3600)/60);if(h)return "in "+h+"h "+m+"m";if(m)return "in "+m+"m";return "in "+s+"s"};
+    var clockPillStyle="position:fixed;right:14px;bottom:78px;z-index:2147483000;display:flex;align-items:center;gap:5px;font:11px/1.3 -apple-system,BlinkMacSystemFont,sans-serif;color:#c47b00;background:rgba(242,169,59,.13);border:1px solid rgba(242,169,59,.3);border-radius:11px;padding:4px 10px;cursor:pointer;-webkit-user-select:none;user-select:none;backdrop-filter:blur(6px)";
+    var clockRingStyle="position:fixed;right:14px;bottom:78px;z-index:2147483000;display:flex;align-items:center;gap:5px;font:11px/1.3 -apple-system,BlinkMacSystemFont,sans-serif;color:#fff;background:rgba(224,86,74,.92);border:1px solid rgba(224,86,74,.9);border-radius:11px;padding:4px 10px;cursor:pointer;-webkit-user-select:none;user-select:none;backdrop-filter:blur(6px)";
+    var clockOutside=function(ev){var p=document.getElementById("vok-clock-panel"),b=document.getElementById("vok-clock-pill");if(p&&!p.contains(ev.target)&&!(b&&b.contains(ev.target)))clockClose()};
+    var clockClose=function(){var p=document.getElementById("vok-clock-panel");if(p)p.remove();document.removeEventListener("mousedown",clockOutside,true)};
+    var clockButton='background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.2);color:#fff;border-radius:7px;padding:4px 9px;font:inherit;cursor:pointer';
+    var buildClockPanel=function(){var p=document.createElement("div");p.id="vok-clock-panel";
+      p.style.cssText="position:fixed;right:14px;bottom:112px;z-index:2147483001;width:276px;background:rgba(30,30,32,.97);color:#fff;border:1px solid rgba(255,255,255,.16);border-radius:12px;padding:14px;box-shadow:0 12px 40px rgba(0,0,0,.35);font:12px/1.4 -apple-system,BlinkMacSystemFont,sans-serif";
+      p.innerHTML='<div style="font-weight:600;font-size:13px;margin-bottom:6px">Phone clock</div>'+
+        '<div id="vok-clock-timer" style="padding:8px 0;border-top:1px solid rgba(255,255,255,.1)"><div style="color:#8ec5ff;font-size:10.5px;letter-spacing:.5px">TIMER</div><div id="vok-clock-timer-big" style="font-size:26px;font-weight:600;line-height:1.25"></div><div id="vok-clock-timer-status" style="color:rgba(255,255,255,.65);font-size:11px"></div><button id="vok-clock-show-timer" style="'+clockButton+';margin-top:7px">Show timer on phone</button></div>'+
+        '<div id="vok-clock-alarm" style="padding:8px 0;border-top:1px solid rgba(255,255,255,.1)"><div style="color:#ffc37a;font-size:10.5px;letter-spacing:.5px">NEXT ALARM</div><div id="vok-clock-alarm-big" style="font-size:22px;font-weight:600;line-height:1.3"></div><div id="vok-clock-alarm-status" style="color:rgba(255,255,255,.65);font-size:11px"></div><div style="display:flex;gap:6px;margin-top:7px;flex-wrap:wrap"><button id="vok-clock-show-alarm" style="'+clockButton+'">Show alarms on phone</button><button id="vok-clock-stop" style="'+clockButton+';display:none;background:rgba(224,86,74,.25);border-color:rgba(224,86,74,.5)">Stop Mac sound</button></div></div>'+
+        '<div style="color:rgba(255,255,255,.45);font-size:10.5px;margin-top:8px">Mirrors the Clock timer and alarm on your phone. Set or cancel them on the phone.</div>';
+      document.body.appendChild(p);
+      p.querySelector("#vok-clock-show-timer").onclick=function(){console.log("__VOK_TIMER_SHOW__")};
+      p.querySelector("#vok-clock-show-alarm").onclick=function(){console.log("__VOK_ALARM_SHOW__")};
+      p.querySelector("#vok-clock-stop").onclick=function(){console.log("__VOK_ALARM_STOP__")};
+      document.addEventListener("mousedown",clockOutside,true)};
+    var updateClockPanel=function(t,a){var p=document.getElementById("vok-clock-panel");if(!p)return;
+      var sec=t.active?(t.paused?t.remainingMs:(t.endsAt?t.endsAt-Date.now():t.remainingMs)):0;
+      var ts=p.querySelector("#vok-clock-timer"),bs=p.querySelector("#vok-clock-timer-big"),ss=p.querySelector("#vok-clock-timer-status");
+      ts.style.display=t.active?"":"none";if(t.active){bs.textContent=fmtClock(sec);ss.textContent=t.paused?"Paused on your phone":"Running on your phone"}
+      var as=p.querySelector("#vok-clock-alarm"),ab=p.querySelector("#vok-clock-alarm-big"),ast=p.querySelector("#vok-clock-alarm-status"),stop=p.querySelector("#vok-clock-stop");
+      as.style.display=a.active?"":"none";if(a.active){ab.textContent=a.ringing?"Ringing":fmtAlarm(a.nextAt);ast.textContent=a.ringing?"Alarm is ringing on your phone":humanLeft(a.nextAt-Date.now());stop.style.display=a.ringing?"":"none"}
+      if(!t.active&&!a.active)clockClose()};
+    var toggleClockPanel=function(){if(document.getElementById("vok-clock-panel"))clockClose();else{buildClockPanel();clockPill()}};
+    var clockPill=function(){
+      if(!/\/index\.html$/.test(location.pathname)||!document.body)return;
+      var t=window.__vokTimerState||{active:false},a=window.__vokAlarmState||{active:false},parts=[];
+      if(t.active){var sec=t.paused?t.remainingMs:(t.endsAt?t.endsAt-Date.now():t.remainingMs);parts.push((t.paused?"⏸ ":"⏱ ")+fmtClock(sec))}
+      if(a.active)parts.push(a.ringing?"⏰ Ringing":("⏰ "+fmtAlarm(a.nextAt)));
+      var p=document.getElementById("vok-clock-pill");
+      if(!parts.length){if(p)p.remove();if(document.getElementById("vok-clock-panel"))clockClose();return}
+      if(!p){p=document.createElement("div");p.id="vok-clock-pill";p.onclick=toggleClockPanel;document.body.appendChild(p)}
+      p.textContent=parts.join(" · ");p.title="Phone clock: timer and next alarm";p.style.cssText=a.ringing?clockRingStyle:clockPillStyle;
+      if(document.getElementById("vok-clock-panel"))updateClockPanel(t,a)};
+    window.__vokTimer=function(s){window.__vokTimerState=s;clockPill()};
+    window.__vokAlarm=function(s){window.__vokAlarmState=s;clockPill()};
+    window.__vokTimerState={active:false};window.__vokAlarmState={active:false};
     /* Settings > Version info: an "English patch" section above vivo's own Check for updates button. */
     var settings=function(){var c=document.getElementById("copy-btn");if(!c||!c.parentElement||!c.parentElement.parentElement)return;
       var root=c.parentElement.parentElement.parentElement;if(!root||root.children.length<2)return;var bottom=root.children[1].firstElementChild||root.children[1];
@@ -326,5 +424,6 @@ el.app.on("web-contents-created",function(e,wc){wc.on("dom-ready",function(){inj
 /* Ask the background helper (if installed) to look for a newer translation now that the app has started. */
 var nudge=function(){wake("launch-request")};
 el.app.whenReady().then(function(){fetchInfo();setInterval(fetchInfo,6*3600*1000);setTimeout(nudge,15000);
-  setTimeout(addICloudMenu,2500);setInterval(addICloudMenu,10000);el.app.on("browser-window-focus",addICloudMenu);el.app.on("activate",addICloudMenu)}).catch(function(){});
+  setTimeout(addICloudMenu,2500);setInterval(addICloudMenu,10000);el.app.on("browser-window-focus",addICloudMenu);el.app.on("activate",addICloudMenu);
+  setTimeout(startAlarmWatcher,2500)}).catch(function(){});
 }catch(e){}})();

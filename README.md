@@ -91,6 +91,17 @@ Notes:
 - **Apps can opt out:** some apps block their audio from being captured, and their sound won't come through.
 - **Separate from vivo:** Wi-Fi audio runs its own copy of Android's `adb` on its own port, so it doesn't interfere with vivo Office Kit.
 
+## Phone alarms on your Mac
+
+While vivo Office Kit is open, the patch can show a normal macOS notification when an alarm in your phone's built-in Clock app fires. It reads your phone's next alarm over ADB, so there is nothing to set up on the phone and no phone-side app is needed.
+
+- The notification appears at the phone's alarm time, with the normal macOS notification sound.
+- If you cancel, delete, or snooze the alarm on the phone, the Mac notification is cancelled too. If it was already shown, it is removed on the next check (about every 10 seconds).
+- It is read-only: the patch never changes, dismisses, or creates alarms on the phone.
+- **Requirements:** the phone must be connected to the Mac by ADB (wireless debugging). The patch looks for a device on ports 5038 and 5037 and uses `adb` from Homebrew or the Android SDK, or the copy bundled with vivo Office Kit. If ADB is not available, the alarm feature simply does nothing.
+
+**Not included in this release:** mirroring the phone's timer into the Mac Clock app. macOS only allows Apple-signed processes (Shortcuts, Clock, Siri) to create real Clock timers, so a third-party patch cannot do it. The earlier in-app timer button was removed.
+
 ## iCloud Photos
 
 The patch adds an **iCloud Photos** item to the **File Manager** sidebar (under **Images**), plus an **iCloud Photos** button in the bottom-right corner and an **iCloud Photos** item in the menu bar. On the File Manager page the photo panel opens in the File Manager's **main pane**, with the File Manager sidebar still visible; on other pages the button opens it over the main window. No separate window. Sign in with your Apple ID and the normal two-factor code, browse your iCloud library, select photos, and download them.
@@ -175,6 +186,8 @@ vivo's programs, background services or system extensions, and it needs nothing 
 - Adds an **iCloud Photos** item to File Manager and an in-app iCloud Photos panel (Apple ID + 2FA,
   photo grid, download), with downloads saved to `Pictures/iCloud Photos` for importing into Albums or
   copying to the phone.
+- Mirrors the phone's Clock alarm as a normal macOS notification, and cancels it when the phone alarm is
+  cancelled or snoozed. This is read-only and needs the phone connected by ADB.
 - Tells macOS the app supports English (the China edition only declares Chinese), so macOS's own windows
   inside the app, such as the file picker for importing files, and the app's name in the menu bar are English.
   If the app already has an English folder, it is left alone.
@@ -205,6 +218,8 @@ after. In both modes the rebuilt archive is read back and verified before it rep
   where it produced valid code.
 - Works only with a phone the China edition already works with. It does not make the app work with phones it
   did not support before.
+- Phone alarm notifications need a live ADB connection to the phone. The phone timer is not mirrored into the
+  Mac Clock app; macOS does not allow third-party apps to create Clock timers.
 
 ## Files
 
